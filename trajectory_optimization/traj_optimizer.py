@@ -1,8 +1,8 @@
-from pyOpt import pySLSQP
-from pyOpt import pyNSGA2
-from pyOpt import pyNLPQL
-from pyOpt import pySOLVOPT
-import pyOpt
+from pyopt import pySLSQP
+from pyopt import pyNSGA2
+from pyopt import pyNLPQL
+from pyopt import pySOLVOPT
+import pyopt
 import numpy as np
 import matplotlib.pyplot as plt
 from fourier_traj import FourierTraj
@@ -32,7 +32,7 @@ class TrajOptimizer:
         self._cartesian_constraints = cartesian_constraints
         self._cartesian_const_num = len(self._cartesian_constraints)
         print('cartesian constraint number: {}'.format(self._cartesian_const_num))
-        self._const_num = self._joint_const_num * 4 + self._cartesian_const_num * 3
+        self._const_num = self._joint_const_num * 4 + self._cartesian_const_num * 3   # ???
         print('constraint number: {}'.format(self._const_num))
 
         self._q0_min = q0_min

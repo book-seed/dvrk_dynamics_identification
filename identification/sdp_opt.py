@@ -1,8 +1,7 @@
 import cvxpy as cp
 import numpy as np
-import sympy
 import osqp
-from utils import gen_DLki_mat, gen_DLki_mat4
+from utils.utils import gen_DLki_mat, gen_DLki_mat4
 
 
 class SDPOpt:

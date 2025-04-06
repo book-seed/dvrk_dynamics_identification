@@ -1,5 +1,5 @@
 import numpy as np
-from scipy import linalg, hstack
+from scipy import linalg
 
 def find_dyn_parm_deps(dof, parm_num, regressor_func):
     '''
@@ -26,7 +26,7 @@ def find_dyn_parm_deps(dof, parm_num, regressor_func):
     Q, R = linalg.qr(Z[:, P])
     R1 = R[:r, :r]
     R2 = R[:r, r:]
-    P_X = np.matmul(hstack((np.eye(r), np.matmul(linalg.inv(R1), R2))), np.transpose(np.eye(parm_num)[:, P]))
+    P_X = np.matmul(np.hstack((np.eye(r), np.matmul(linalg.inv(R1), R2))), np.transpose(np.eye(parm_num)[:, P]))
 
     P_X = np.around(P_X, 8)
 

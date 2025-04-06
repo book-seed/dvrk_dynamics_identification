@@ -1,6 +1,6 @@
 import unittest
 import sympy
-from robot_def import RobotDef, new_sym
+from model.robot_def import RobotDef, new_sym
 
 
 class RobotDefTestCase(unittest.TestCase):

@@ -1,16 +1,14 @@
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils import utils
 import sympy
-from sympy.physics.vector import dynamicsymbols
-import numpy as np
-from utils import inertia_vec2tensor, ml2r, Lmr2I, new_sym
-
-
-def new_sym(name):
-    return sympy.symbols(name, real=True)
+from sympy.physics.mechanics import dynamicsymbols
 
 _cos = sympy.cos
 _sin = sympy.sin
 
-_dh_alpha, _dh_a, _dh_d, _dh_theta = new_sym('alpha,a,d,theta')
+_dh_alpha, _dh_a, _dh_d, _dh_theta = utils.new_sym('alpha,a,d,theta')
 default_dh_symbols = (_dh_alpha, _dh_a, _dh_d, _dh_theta)
 
 _standard_dh_transfmat = sympy.Matrix([
@@ -29,8 +27,8 @@ _friction_types = ['Coulomb', 'viscous', 'offset']
 
 
 class RobotDef:
-    def __init__(self, params, dh_convention='mdh', friction_type=['viscous']):
-
+    def __init__(self, name, params, dh_convention='mdh', friction_type=['viscous']):
+        self.name = name
         self.frame_num = len(params)
         self.link_nums = [p[0] for p in params]
         self.prev_link_num = [p[1] for p in params]
@@ -54,11 +52,11 @@ class RobotDef:
         self._gen_params()
         self._dyn_params()
         self._gen_coordinates()
+        # self._print()
 
     def _gen_coordinates(self):
         self.coordinates = []
         self.coordinates_joint_type = []
-        # self.joint_coordinate = list(range(self.frame_num))
         for num in self.link_nums:
             for s in self.dh_T[num].free_symbols:
                 if s not in self.coordinates:
@@ -66,9 +64,8 @@ class RobotDef:
                     self.coordinates_joint_type += [self.joint_type[num]]
         self.dof = len(self.coordinates)
 
-        self.d_coordinates = [new_sym('d'+co.name) for co in self.coordinates]
-        self.dd_coordinates = [new_sym('dd' + co.name) for co in self.coordinates]
-
+        self.d_coordinates = [utils.new_sym('d'+co.name) for co in self.coordinates]
+        self.dd_coordinates = [utils.new_sym('dd' + co.name) for co in self.coordinates]
 
         self.coordinates_t = [dynamicsymbols(co.name+'t') for co in self.coordinates]
         self.d_coordinates_t = [sympy.diff(co_t) for co_t in self.coordinates_t]
@@ -103,7 +100,6 @@ class RobotDef:
 
             self.ddq_for_frame[i] = ddq
 
-
     def _gen_dh_transfm(self):
         self.dh_T = []
         self.joint_type = []
@@ -117,52 +113,52 @@ class RobotDef:
                 self.joint_type.append("R")  # Revolute
             else:
                 self.joint_type.append("A")  # Assitive
-        # print(self.joint_type)
-        #print(self.dh_T)
 
     def _gen_params(self):
-        self.m = list(range(self.frame_num))
-        self.l = list(range(self.frame_num))
-        self.r = list(range(self.frame_num))
-        self.r_by_ml = list(range(self.frame_num))
-        self.L_vec = list(range(self.frame_num))
-        self.I_vec = list(range(self.frame_num))
-        self.L_mat = list(range(self.frame_num))
-        self.I_mat = list(range(self.frame_num))
-        self.I_by_Llm = list(range(self.frame_num))
-        self.Fc = list(range(self.frame_num))
-        self.Fv = list(range(self.frame_num))
-        self.Fo = list(range(self.frame_num))
+        self.m = list(range(self.frame_num))                # mass
+        self.l = list(range(self.frame_num))                # the first moment of inertia vector (惯性矩向量)
+        self.r = list(range(self.frame_num))                #
+        self.L_vec = list(range(self.frame_num))            # inertia tensor vector in link frame
+        self.I_vec = list(range(self.frame_num))            # inertia tensor vector in COM frame
+        self.L_mat = list(range(self.frame_num))            # inertia tensor matrix in link frame
+        self.I_mat = list(range(self.frame_num))            # inertia tensor matrix in com frame
+
+        self.Fc = list(range(self.frame_num))               # coulomb friction
+        self.Fv = list(range(self.frame_num))               # viscous friction
+        self.Fo = list(range(self.frame_num))               # offset friction
         self.Ia = list(range(self.frame_num))
         self.K = list(range(len(self.spring_dl)))
-
         self.spring_num = 0
 
+        # processing variables
+        self.r_by_ml = list(range(self.frame_num))  #  COM relative to the link frame = l / m
+        self.I_by_Llm = list(range(self.frame_num))
+
         for num in self.link_nums[1:]:
-            self.m[num] = new_sym('m'+str(num))
-            self.l[num] = [new_sym('l'+str(num)+dim) for dim in ['x', 'y', 'z']]
-            self.r[num] = [new_sym('r'+str(num)+dim) for dim in ['x', 'y', 'z']]
-            self.I_vec[num] = [new_sym('I'+str(num)+elem) for elem in ['xx', 'xy', 'xz', 'yy', 'yz', 'zz']]
-            self.L_vec[num] = [new_sym('L'+str(num)+elem) for elem in ['xx', 'xy', 'xz', 'yy', 'yz', 'zz']]
+            self.m[num] = utils.new_sym('m'+str(num))
+            self.l[num] = [utils.new_sym('l'+str(num)+dim) for dim in ['x', 'y', 'z']]
+            self.r[num] = [utils.new_sym('r'+str(num)+dim) for dim in ['x', 'y', 'z']]
+            self.I_vec[num] = [utils.new_sym('I'+str(num)+elem) for elem in ['xx', 'xy', 'xz', 'yy', 'yz', 'zz']]
+            self.L_vec[num] = [utils.new_sym('L'+str(num)+elem) for elem in ['xx', 'xy', 'xz', 'yy', 'yz', 'zz']]
+            self.I_mat[num] = utils.inertia_vec2tensor(self.I_vec[num])
+            self.L_mat[num] = utils.inertia_vec2tensor(self.L_vec[num])
 
-            self.I_mat[num] = inertia_vec2tensor(self.I_vec[num])
-            self.L_mat[num] = inertia_vec2tensor(self.L_vec[num])
 
-            self.r_by_ml[num] = ml2r(self.m[num], self.l[num])
-            self.I_by_Llm[num] = Lmr2I(self.L_mat[num], self.m[num], self.r_by_ml[num])
+            self.r_by_ml[num] = utils.ml2r(self.m[num], self.l[num])
+            self.I_by_Llm[num] = utils.Lmr2I(self.L_mat[num], self.m[num], self.r_by_ml[num])
 
-            if 'Coulomb' in self.friction_type:
-                self.Fc[num] = new_sym('Fc' + str(num))
+            if 'coulomb' in self.friction_type:
+                self.Fc[num] = utils.new_sym('Fc' + str(num))
             if 'viscous' in self.friction_type:
-                self.Fv[num] = new_sym('Fv' + str(num))
+                self.Fv[num] = utils.new_sym('Fv' + str(num))
             if 'offset' in self.friction_type:
-                self.Fo[num] = new_sym('Fo' + str(num))
+                self.Fo[num] = utils.new_sym('Fo' + str(num))
 
             if self.use_Ia[num]:
-                self.Ia[num] = new_sym('Ia' + str(num))
+                self.Ia[num] = utils.new_sym('Ia' + str(num))
 
-            if self.spring_dl[num] != None:
-                self.K[num] = new_sym('K' + str(num))
+            if self.spring_dl[num] is not None:
+                self.K[num] = utils.new_sym('K' + str(num))
                 self.spring_num += 1
 
     def _dyn_params(self):
@@ -171,16 +167,18 @@ class RobotDef:
 
         for num in self.link_nums[1:]:
             if self.use_inertia[num]:
+                # inertial parameters in link frame
                 self.bary_params += self.L_vec[num]
                 self.bary_params += self.l[num]
                 self.bary_params += [self.m[num]]
 
+                # inertial parameters in COM frame
                 self.std_params += self.I_vec[num]
                 self.std_params += self.r[num]
                 self.std_params += [self.m[num]]
 
             if self.use_friction[num]:
-                if 'Coulomb' in self.friction_type:
+                if 'coulomb' in self.friction_type:
                     self.bary_params += [self.Fc[num]]
                     self.std_params += [self.Fc[num]]
                 if 'viscous' in self.friction_type:
@@ -194,6 +192,15 @@ class RobotDef:
                 self.bary_params += [self.Ia[num]]
                 self.std_params += [self.Ia[num]]
 
-            if self.spring_dl[num] != None:
+            if self.spring_dl[num] is not None:
                 self.bary_params += [self.K[num]]
                 self.std_params += [self.K[num]]
+
+    def _print(self):
+        print("dq_for_frame = {}".format(self.dq_for_frame))
+        print("ddq_for_frame = {}".format(self.ddq_for_frame))
+        print("coordinates_joint_type = {}".format(self.coordinates_joint_type))
+        print("coordinates = {}".format(self.coordinates))
+        print("d_coordinates = {}".format(self.d_coordinates))
+        print("dd_coordinates = {}".format(self.dd_coordinates))
+        print("bary_param = {}".format(self.bary_params))

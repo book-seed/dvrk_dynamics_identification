@@ -1,6 +1,5 @@
 import unittest
-import sympy
-from utils import *
+from utils.utils import *
 import numpy as np
 
 

@@ -34,9 +34,10 @@ parameters of other robots.
 * Output of the identified parameters to json files
 
 ## Requirements
-* Python 2.7
+* Python 3.12
 * Python modules
-    * NumPy, SciPy, SymPy, CvxOpt, Matplotlib, PyOpt, cloudpickle
+    * NumPy, SymPy, Matplotlib, cloudpickle, 
+    * SciPy, CvxOpt, PyOpt, 
 
 
 Anaconda is recommended.

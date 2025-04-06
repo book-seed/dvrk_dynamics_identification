@@ -1,7 +1,6 @@
 import sympy
 import numpy as np
 import cloudpickle as pickle
-import os.path
 import os
 import errno
 import csv
@@ -12,32 +11,50 @@ def new_sym(name):
 
 
 def vec2so3(vec):
-    return sympy.Matrix([[0,        -vec[2],    vec[1]],
-                         [vec[2],   0,          -vec[0]],
-                         [-vec[1],  vec[0],     0]])
+    """
+    param vec: 3-vector (angular velocity)
+    return: 3x3 skew-symmetric matrix in so3
+    """
+    return sympy.Matrix([[0,      -vec[2],  vec[1]],
+                         [vec[2],       0, -vec[0]],
+                         [-vec[1], vec[0],      0]])
 
 
 def so32vec(mat):
-    return sympy.Matrix([[mat[2, 1]],
-                         [mat[0, 2]],
-                         [mat[1, 0]]])
+    """
+    param mat: 3x3 skew-symmetric matrix in so3
+    return: 3-vector (angular velocity)
+    """
+    return sympy.Matrix([[mat[2, 1]], [mat[0, 2]], [mat[1, 0]]])
 
 
 def inertia_vec2tensor(vec):
+    """
+    param vec: 6-vector [Ixx Ixy Ixz Iyy Iyz Izz]
+    return: 3x3 inertia tensor matrix
+    """
     return sympy.Matrix([[vec[0], vec[1], vec[2]],
                          [vec[1], vec[3], vec[4]],
                          [vec[2], vec[4], vec[5]]])
 
 
-def inertia_tensor2vec(I):
-    return [I[0, 0], I[0, 1], I[0, 2], I[1, 1], I[1, 2], I[2, 2]]
+def inertia_tensor2vec(mat):
+    """
+    param mat: 3x3 inertia tensor matrix
+    return: 6-vector [Ixx Ixy Ixz Iyy Iyz Izz]
+    """
+    return [mat[0, 0], mat[0, 1], mat[0, 2], mat[1, 1], mat[1, 2], mat[2, 2]]
 
 
-def tranlation_transfmat(v):
-    return sympy.Matrix([[1, 0, 0, v[0]],
-                        [0, 1, 0, v[1]],
-                        [0, 0, 1, v[2]],
-                        [0, 0, 0, 1]])
+def translation_transmat(p):
+    """
+    param v: 3-vector (translation)
+    return: 4x4 homogeneous transformation matrix
+    """
+    return sympy.Matrix([[1, 0, 0, p[0]],
+                         [0, 1, 0, p[1]],
+                         [0, 0, 1, p[2]],
+                         [0, 0, 0,   1]])
 
 
 def ml2r(m, l):
@@ -47,7 +64,7 @@ def ml2r(m, l):
 def Lmr2I(L, m, r):
     return sympy.Matrix(L - m * vec2so3(r).transpose() * vec2so3(r))
 
-
+'''
 def gen_DLki_mat():
     M = list(range(10))
     for i in range(10):
@@ -130,20 +147,31 @@ def gen_DLki_mat4():
     M[9][3, 3] = 1
 
     return M
-
+'''
 
 def save_data(folder, name, data):
-    model_file = folder + name + '.pkl'
-
+    model_file = os.path.dirname(os.getcwd()) + folder + name + '.pkl'
     if not os.path.exists(os.path.dirname(model_file)):
         try:
             os.makedirs(os.path.dirname(model_file))
-        except OSError as exc:  # Guard against race condition
+        except OSError as exc:
             if exc.errno != errno.EEXIST:
                 raise
 
-    with open(model_file, 'w+') as f:
+    with open(model_file, 'wb') as f:
         pickle.dump(data, f)
+
+
+def load_data(folder, name):
+    model_file = os.path.dirname(os.getcwd()) + folder + name + '.pkl'
+    if os.path.exists(model_file):
+        data = pickle.load(open(model_file, 'rb'))
+        return data
+    else:
+        raise Exception("No {} can be found!".format(model_file))
+
+
+
 
 def save_csv_data(folder, name, data):
     with open(folder + name + '.csv', 'wb') as myfile:
@@ -151,10 +179,5 @@ def save_csv_data(folder, name, data):
         for i in range(np.size(data, 0) - 10):
             wr.writerow(data[i])
 
-def load_data(folder, name):
-    model_file = folder + name + '.pkl'
-    if os.path.exists(model_file):
-        data = pickle.load(open(model_file, 'rb'))
-        return data
-    else:
-        raise Exception("No {} can be found!".format(model_file))
+
+

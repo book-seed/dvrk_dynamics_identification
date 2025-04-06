@@ -1,6 +1,6 @@
 import sympy
 import matplotlib.pyplot as plt
-from frame_drawer import FrameDrawer
+#import frame_drawer
 import numpy as np
 from collections import deque
 
