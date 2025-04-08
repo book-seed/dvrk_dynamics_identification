@@ -1,4 +1,3 @@
-import threading
 import sympy
 import numpy as np
 from kinematics.frame_drawer import FrameDrawer

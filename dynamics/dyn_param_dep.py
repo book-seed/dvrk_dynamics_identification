@@ -2,12 +2,11 @@ import numpy as np
 from scipy import linalg
 
 def find_dyn_parm_deps(dof, parm_num, regressor_func):
-    '''
+    """
     Find dynamic parameter dependencies (i.e., regressor column dependencies).
-    '''
+    """
 
     samples = parm_num*2
-    round = 10
 
     pi = np.pi
 
@@ -22,7 +21,6 @@ def find_dyn_parm_deps(dof, parm_num, regressor_func):
 
     r = np.linalg.matrix_rank(Z)
     _, _, P = linalg.qr(Z, pivoting=True)
-
     Q, R = linalg.qr(Z[:, P])
     R1 = R[:r, :r]
     R2 = R[:r, r:]

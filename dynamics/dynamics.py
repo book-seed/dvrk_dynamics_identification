@@ -232,6 +232,7 @@ class Dynamics:
         return A  
     
     def _calc_H_func(self):
+        print("calculating H_func ...")
         input_vars = tuple(self.rbt_def.coordinates +self.rbt_def.d_coordinates + self.rbt_def.dd_coordinates)
         self.H_func = sympy.lambdify(input_vars, self.H)
           
