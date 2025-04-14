@@ -85,6 +85,7 @@ class FourierTraj:
     def fourier_base_x2q(self, x):
 
         # x 表征激励轨迹的系数，对于单个dof的5级傅里叶级数, [q_ok, a1k, a2k, a3k, a4k ,a5k, b1k, b2k, b3k, b4k, b5k]
+        # return 轨迹上每个采样点的位置，速度，加速度
 
         for d in range(self.dof):
             start = d * (2 * self.order + 1)

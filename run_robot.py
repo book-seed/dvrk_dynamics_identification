@@ -122,7 +122,7 @@ while i < len(a) and not rospy.is_shutdown():
 
 
 # Save data
-data_file_dir = './data/' + modelname + '/measured_trajectory/' + testname + '_results.csv'
+data_file_dir = './data/' + modelname + '/measured_traj/' + testname + '_results.csv'
 
 if not os.path.exists(os.path.dirname(data_file_dir)):
     try:

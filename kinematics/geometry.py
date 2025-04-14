@@ -21,7 +21,7 @@ else:
 
 
 class Geometry:
-    def __init__(self, rbt_def, config):
+    def __init__(self, rbt_def, load_data_from_file):
         
         self.rbt_def = rbt_def
         self.model_folder = '/data/' + self.rbt_def.name + '/model/'
@@ -35,7 +35,7 @@ class Geometry:
         self.w_b = list(sympy.simplify(range(self.rbt_def.frame_num)))
 
         condition = 'load_kinematic_from_file'
-        if next((value for key, value in config if key == condition), None) is True :
+        if load_data_from_file is True :
             print("load kinematic data from file starting.")
             start_time = time.time()
             # self._load_data_sp()

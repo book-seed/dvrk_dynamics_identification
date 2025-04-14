@@ -1,258 +1,122 @@
-# This file is originally adopted from https://github.com/cdsousa/wam7_dyn_ident
-# and modified by Yan Wang
-import math
+# This file is originally adopted from https://github.com/cdsousa/wam7_dyn_ident and modified by Yan Wang
+import os
 import numpy as np
-import scipy.signal
+import scipy
 import pandas as pd
 import matplotlib.pyplot as plt
-from utils.utils import Lmr2I, inertia_vec2tensor, inertia_tensor2vec
+from utils import diff
 import sympy
 
-# the format of file should be q0, tau0, q1, tau1, ..., qn, taun
-def load_trajectory_data(file, freq):
-    f = np.array(pd.read_csv(file, sep=',', header=None))
-    row, col = f.shape
-    sample_num = row
-    dof = col/3
+# Demand: the format of file should be
+# q0, dq0 tau0, q1, dq1, tau1, ..., qn, dqn, taun
+
+class DataProcessor:
+    def __init__(self, data, base_param_num, H_b_func):
+
+        self._measured_data_file = data.measured_data_file_ + '.csv'
+        self._sample_freq = data.sample_freq_
+        self._cutoff_freq = data.cutoff_freq_
+        self._cut_num = data.cut_num_
+        self._filter_order = data.filter_order_
+        self._callback = data.callback_
+
+        self._load_trajectory_data()
+        self._diff_and_filt_data()
+
+    def _load_trajectory_data(self):
+        f = np.array(pd.read_csv(os.path.dirname(os.getcwd())+self._measured_data_file, sep=',', header=None))
+        row, col = f.shape
+        sample_num = row
+        self.dof = int(col/3)
+
+        # 此处设置的采样频率要和实际数据的采样频率一致
+        self.t_raw = np.array(range(sample_num), dtype=float) / self._sample_freq
+        self.q_raw = np.zeros((row, self.dof))
+        self.dq_raw = np.zeros((row, self.dof))
+        self.ddq_raw = np.zeros((row, self.dof))
+        self.tau_raw = np.zeros((row, self.dof))
+
+        for d in range(self.dof):
+            self.q_raw[:, d] = f[:, d]
+            self.dq_raw[:, d] = f[:, self.dof + d]
+            self.tau_raw[:, d] = f[:, 2 * self.dof + d]
+
+        self.q_raw, self.dq_raw, self.tau_raw = \
+            self._callback(self.q_raw, self.dq_raw, self.tau_raw)
+
+    def _diff_and_filt_data(self):
+
+        q_tmp = np.zeros_like(self.q_raw)
+        dq_tmp = np.zeros_like(self.dq_raw)
+        ddq_tmp = np.zeros_like(self.dq_raw)
+        tau_tmp = np.zeros_like(self.tau_raw)
+
+        butter_coef = scipy.signal.butter(self._filter_order, self._cutoff_freq / (self._sample_freq / 2))
+
+        for i in range(self.dof):
+            self.ddq_raw[:, i] = diff.central_diff(self.dq_raw[:, i], 1.0 / self._sample_freq, order='4th_order_precision')
+
+            q_tmp[:, i] = scipy.signal.filtfilt(butter_coef[0], butter_coef[1], self.q_raw[:, i])
+            dq_tmp[:, i] = scipy.signal.filtfilt(butter_coef[0], butter_coef[1], self.dq_raw[:, i])
+            ddq_tmp[:, i] = scipy.signal.filtfilt(butter_coef[0], butter_coef[1], self.ddq_raw[:, i])
+            tau_tmp[:, i] = scipy.signal.filtfilt(butter_coef[0], butter_coef[1], self.tau_raw[:, i])
+
+        self.t_cut = self.t_raw[self._cut_num:-self._cut_num]
+
+        self.q_filt_cut = q_tmp[self._cut_num:-self._cut_num, :]
+        self.dq_filt_cut = dq_tmp[self._cut_num:-self._cut_num, :]
+        self.ddq_filt_cut = ddq_tmp[self._cut_num:-self._cut_num, :]
+        self.tau_filt_cut = tau_tmp[self._cut_num:-self._cut_num, :]
+
+        self.q_raw_cut = self.q_raw[self._cut_num:-self._cut_num, :]
+        self.dq_raw_cut = self.dq_raw[self._cut_num:-self._cut_num, :]
+        self.ddq_raw_cut = self.ddq_raw[self._cut_num:-self._cut_num, :]
+        self.tau_raw_cut = self.tau_raw[self._cut_num:-self._cut_num, :]
 
 
-    print(type(f), f.shape)
+def plot_and_save_trajectory_data(pic_path, data):
 
-    t = np.array(range(sample_num), dtype=float) / freq
+    t = data.t_cut
+    q_raw = data.q_raw_cut
+    q_filter = data.q_filt_cut
+    dq_raw = data.dq_raw_cut
+    dq_filter = data.dq_filt_cut
+    ddq_raw = data.ddq_raw_cut
+    ddq_filter = data.ddq_filt_cut
+    tau_raw = data.tau_raw_cut
+    tau_filter = data.tau_filt_cut
 
-    q = np.zeros((row, dof))
-    dq = np.zeros((row, dof))
-    tau = np.zeros((row, dof))
-
-    for d in range(dof):
-        q[:, d] = f[:, d]
-        dq[:, d] = f[:, dof + d]
-        tau[:, d] = f[:, 2*dof + d]
-
-    return t, q, dq, tau
-
-
-def central_diff(array, div, n=2):
-    size = len(array)
-    diff = np.zeros_like(array)
-    if n == 1:
-        diff[0] = (array[1] - array[0]) / div
-        for i in range(1, size - 1):
-            diff[i] = (array[i + 1] - array[i - 1]) / (2 * div)
-        diff[size - 1] = (array[size - 1] - array[size - 2]) / div
-    elif n == 2:
-        diff[0] = (array[1] - array[0]) / div
-        diff[1] = (array[2] - array[0]) / (2 * div)
-        for i in range(2, size - 2):
-            diff[i] = (- array[i + 2] + 8 * array[i + 1] - 8 * array[i - 1] + array[i - 2]) / (12 * div)
-        diff[size - 2] = (array[size - 1] - array[size - 3]) / (2 * div)
-        diff[size - 1] = (array[size - 1] - array[size - 2]) / div
-    else:
-        raise Exception('use n = 1 or 2')
-    return diff
-
-
-def central_2nd_diff(array, div, n=2):
-    size = len(array)
-    diff = np.zeros_like(array)
-    if n == 1:
-        diff[0] = (array[1 + 1] - 2 * array[1] + array[1 - 1]) / (div * div)
-        for i in range(1, size - 1):
-            diff[i] = (array[i + 1] - 2 * array[i] + array[i - 1]) / (div * div)
-        diff[size - 1] = (array[(size - 2) + 1] - 2 * array[(size - 2)] + array[(size - 2) - 1]) / (div * div)
-    elif n == 2:
-        diff[0] = diff[1] = (array[1 + 1] - 2 * array[1] + array[1 - 1]) / (div * div)
-        for i in range(2, size - 2):
-            diff[i] = (- array[i + 2] + 16 * array[i + 1] - 30 * array[i] + 16 * array[i - 1] - array[i - 2]) / (
-                        12 * div * div)
-        diff[size - 1] = diff[size - 2] = (array[(size - 2) + 1] - 2 * array[(size - 2)] + array[(size - 2) - 1]) / (
-                    div * div)
-    else:
-        raise Exception('use n = 1 or 2')
-    return diff
-
-#
-# def filtfilt_simple(b, a, input_vector):
-#     '''input_vector has shape (n,1)'''
-#     forward = scipy.signal.lfilter(b, a, input_vector, axis=0)
-#     return scipy.flipud(scipy.signal.lfilter(b, a, scipy.flipud(forward), axis=0))
-#
-#
-# def lfilter_zi(b, a):
-#     # compute the zi state from the filter parameters. see [Gust96].
-#
-#     # Based on:
-#     # [Gust96] Fredrik Gustafsson, Determining the initial states in forward-backward
-#     # filtering, IEEE Transactions on Signal Processing, pp. 988--992, April 1996,
-#     # Volume 44, Issue 4
-#
-#     n = max(len(a), len(b))
-#
-#     zin = (numpy.eye(n - 1) - numpy.hstack((-a[1:n, numpy.newaxis],
-#                                             numpy.vstack((numpy.eye(n - 2), numpy.zeros(n - 2))))))
-#
-#     zid = b[1:n] - a[1:n] * b[0]
-#
-#     zi_matrix = numpy.linalg.inv(zin) * (numpy.matrix(zid).transpose())
-#     zi_return = []
-#
-#     # convert the result into a regular array (not a matrix)
-#     for i in range(len(zi_matrix)):
-#         zi_return.append(float(zi_matrix[i][0]))
-#
-#     return numpy.array(zi_return)
-#
-#
-def filtfilt(b, a, x):
-    # For now only accepting 1d arrays
-    ntaps = max(len(a), len(b))
-    edge = ntaps * 3
-
-    if x.ndim != 1:
-        raise ValueError("Filiflit is only accepting 1 dimension arrays.")
-
-    # x must be bigger than edge
-    if x.size < edge:
-        raise ValueError("Input vector needs to be bigger than 3 * max(len(a),len(b).")
-
-    if len(a) < ntaps:
-        a = np.r_[a, np.zeros(len(b) - len(a))]
-
-    if len(b) < ntaps:
-        b = np.r_[b, np.zeros(len(a) - len(b))]
-
-    zi = scipy.signal.lfilter_zi(b, a)
-
-    # Grow the signal to have edges for stabilizing
-    # the filter with inverted replicas of the signal
-    s = np.r_[2 * x[0] - x[edge:1:-1], x, 2 * x[-1] - x[-1:-edge:-1]]
-    # in the case of one go we only need one of the extrems
-    # both are needed for filtfilt
-
-    (y, zf) = scipy.signal.lfilter(b, a, s, -1, zi * s[0])
-
-    (y, zf) = scipy.signal.lfilter(b, a, np.flipud(y), -1, zi * y[-1])
-
-    return np.flipud(y[edge - 1:-edge + 1])
-#
-#
-# def butter_lfilter(N, Wn, signal):
-#     butter_b, butter_a = scipy.signal.butter(N, Wn)
-#     filtered_signal = scipy.signal.lfilter(butter_b, butter_a, signal)
-#     return filtered_signal
-#
-#
-_inf = float('inf')
-
-
-def butter_filtfilt(N, Wn, signal):
-    if Wn == _inf: return signal[:]
-    butter_b, butter_a = scipy.signal.butter(N, Wn)
-    filtered_signal = filtfilt(butter_b, butter_a, signal)
-    return filtered_signal
-#
-#
-
-#
-#
-# def read_data(dof, h, rbtlogfile, trajreffile):
-#     rbtlog = numpy.loadtxt(rbtlogfile)
-#     s = rbtlog.shape[0]
-#     t = numpy.array(rbtlog[:, 0])
-#     q = numpy.array(rbtlog[:, 1:dof + 1])
-#     tau = numpy.array(rbtlog[:, dof + 1:dof * 2 + 1])
-#
-#     h_avg = (t[-1] - t[0]) / len(t)
-#     # print ('h avg',h_avg,'h nom',h)
-#     if abs((h_avg / h) - 1) > 10e-5:
-#         print('h nom != h avg')
-#         print ('h avg', h_avg, 'h nom', h)
-#
-#     trajref = numpy.loadtxt(trajreffile)
-#     reft = numpy.array([h * i for i in range(trajref.shape[0])])
-#
-#     return t, q, tau, reft, trajref
-#
-#
-def diff_and_filt_data(dof, h, t, q_raw, dq_raw, tau_raw, fc_q, fc_tau, fc_dq, fc_ddq, cut_num = 200, filter_order=6):
-    s = q_raw[0].shape[0]
-
-    q = np.zeros_like(q_raw)
-    dq = np.zeros_like(dq_raw)
-    ddq = np.zeros_like(dq_raw)
-    tau = np.zeros_like(tau_raw)
-
-    if fc_q.shape[0] == 1:
-        wc_q = [fc_q[0] * 2 * math.pi * h]*dof
-        wc_dq = [fc_dq[0] * 2 * math.pi * h]*dof
-        wc_ddq = [fc_ddq[0] * 2 * math.pi * h]*dof
-        wc_tau = [fc_tau[0] * 2 * math.pi * h]*dof
-
-
-    else:
-        wc_q = fc_q * 2 * math.pi * h
-        wc_dq = fc_dq * 2 * math.pi * h
-        wc_ddq = fc_ddq * 2 * math.pi * h
-        wc_tau = fc_tau * 2 * math.pi * h
-
-    print('q_raw shape: {}'.format(q_raw.shape))
-    for i in range(dof):
-        q[:, i] = butter_filtfilt(filter_order, wc_q[i], q_raw[:, i])
-
-        # joint_i_dq_raw = central_diff(q_raw[:, i], h, 2)
-        # dq[:, i] = butter_filtfilt(filter_order, wc_dq, joint_i_dq_raw)
-        dq[:, i] = butter_filtfilt(filter_order, wc_dq[i], dq_raw[:, i])
-
-        # joint_i_ddq_raw = central_diff(joint_i_dq_raw, h, 2)
-        joint_i_ddq_raw = central_diff(dq_raw[:, i], h, 2)
-        ddq[:, i] = butter_filtfilt(filter_order, wc_ddq[i], joint_i_ddq_raw)
-        # ddq[:,i] = central_diff( central_diff(q[:,i],h,2) ,h,2)
-
-        tau[:, i] = butter_filtfilt(filter_order, wc_tau[i], tau_raw[:, i])
-        # tau[:,i] = butter_lfilter( 3, wc_tau, tau_raw[:,i] )
-
-    return t[cut_num:-cut_num],\
-           q[cut_num:-cut_num, :], dq[cut_num:-cut_num, :], ddq[cut_num:-cut_num, :], tau[cut_num:-cut_num, :],\
-           q_raw[cut_num:-cut_num, :], tau_raw[cut_num:-cut_num, :]
-
-
-def plot_trajectory_data(t, q_raw, q_f, dq_f, ddq_f, tau_raw, tau_f):
     dof = q_raw.shape[1]
-    plot_shape = 400 + dof*10
-    print("plot shape: {}".format(plot_shape))
 
-    fig = plt.figure()
+    fig, axes = plt.subplots(dof, 4, figsize=(10,15))
 
-    for i in range(dof):
-        plt_q = fig.add_subplot(4, dof, i + 1)
-        plt_q.plot(t, q_raw[:, i])
-        plt_q.plot(t, q_f[:, i])
-        if i == 0:
-            plt_q.set_ylabel(r'$q$ (rad or m)')
-        plt_q.set_title("Joint {}".format(i+1))
+    fig.suptitle('trajectory data before and after filtering', fontsize=18)
 
-    for i in range(dof):
-        plt_dq = fig.add_subplot(4, dof, i + 1 + dof)
-        plt_dq.plot(t, dq_f[:, i])
-        if i == 0:
-            plt_dq.set_ylabel(r'$\dot{q}$ (rad/s or m/s)')
+    top_labels = ['q', r'$\dot{q}$', r'$\ddot{q}$', r'$\tau$']
+    left_labels = [f'J{i+1}' for i in range(dof)]
+
+    for j, label in enumerate(top_labels):
+        axes[0, j].set_title(label, fontsize=14, pad=20)
+
+    for i, label in enumerate(left_labels):
+        axes[i, 0].set_ylabel(label, fontsize=14, rotation=0, labelpad=20)
 
     for i in range(dof):
-        plt_ddq = fig.add_subplot(4, dof, i + 1 + 2*dof)
-        plt_ddq.plot(t, ddq_f[:, i])
-        if i == 0:
-            plt_ddq.set_ylabel(r'$\ddot{q}$ (rad/s$^2$ or m/s$^2$)')
+        axes[i, 0].plot(t, q_raw[:, i])
+        axes[i, 0].plot(t, q_filter[:, i])
+        # axes[i, 1].plot(t, dq_raw[:, i])
+        axes[i, 1].plot(t, dq_filter[:, i])
+        # axes[i, 2].plot(t, ddq_raw[:, i])
+        axes[i, 2].plot(t, ddq_filter[:, i])
+        axes[i, 3].plot(t, tau_raw[:, i])
+        axes[i, 3].plot(t, tau_filter[:, i])
 
-    for i in range(dof):
-        plt_tau = fig.add_subplot(4, dof, i + 1 + 3*dof)
-        plt_tau.plot(t, tau_raw[:, i])
-        plt_tau.plot(t, tau_f[:, i])
-        plt_tau.set_xlabel(r'$t$ (s)')
-        if i == 0:
-            plt_tau.set_ylabel(r'$\tau$ (Nm) or $f$ (N)')
+    plt.subplots_adjust(hspace=0.5, wspace=0.3)
+    plt.savefig(os.path.dirname(os.getcwd()) + pic_path + '.png', dpi=300)
+    # plt.show()
 
-    plt.tight_layout()
-    plt.show()
+
+
 
 
 def plot_meas_pred_tau(t, tau_m, tau_p, joint_type, coordinates):
@@ -323,21 +187,6 @@ def plot_meas_2pred_tau(t, tau_m, tau_p1, tau_p2, joint_type, coordinates):
         plt_tau.tick_params(labelsize=font_size_def)
     plt.tight_layout()
     plt.show()
-
-def gen_regressor(param_num, H, q, dq, ddq, tau):
-    sample_num, dof = q.shape
-
-    W = np.zeros((sample_num*dof, param_num))
-    tau_s = np.zeros(sample_num*dof)
-
-    for i in range(sample_num):
-        vars_input = q[i, :].tolist() + dq[i, :].tolist() + ddq[i, :].tolist()
-        W[i*dof:(i+1)*dof, :] = H(*vars_input)
-
-        for d in range(dof):
-            tau_s[i*dof + d] = tau[i, d]
-
-    return W, tau_s
 
 
 def barycentric2standard_params(x, rbt_def, Rs=None):

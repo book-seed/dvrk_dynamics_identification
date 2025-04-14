@@ -14,7 +14,7 @@ ForkingPickler.dumps = dill.dumps
 
 
 class Dynamics:
-    def __init__(self, rbt_def, geom, config, g=[0, 0, -9.81]):
+    def __init__(self, rbt_def, geom, load_data_from_file, g=[0, 0, -9.81]):
 
         self.rbt_def = rbt_def
         self.model_folder = '/data/' + self.rbt_def.name + '/model/'
@@ -22,7 +22,7 @@ class Dynamics:
         self._g = np.matrix(g)
 
         condition = 'load_dynamic_from_file'
-        if next((value for key, value in config if key == condition), None) is True:
+        if load_data_from_file is True:
             print("load dynamic data from file starting.")
             start_time = time.time()
             self._load_data()

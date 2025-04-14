@@ -174,8 +174,8 @@ def load_data(folder, name):
 
 
 def save_csv_data(folder, name, data):
-    with open(folder + name + '.csv', 'wb') as myfile:
-        wr = csv.writer(myfile, quoting=csv.QUOTE_NONE)
+    with open(folder + name + '.csv', 'wb') as my_file:
+        wr = csv.writer(my_file, quoting=csv.QUOTE_NONE)
         for i in range(np.size(data, 0) - 10):
             wr.writerow(data[i])
 

@@ -36,7 +36,7 @@ parameters of other robots.
 ## Requirements
 * Python 3.12
 * Python modules
-    * NumPy, SymPy, Matplotlib, cloudpickle, 
+    * NumPy, SymPy, Matplotlib, cloudpickle, Pandas
     * SciPy, CvxOpt, PyOpt, 
 
 

@@ -3,28 +3,28 @@ from dynamics import dynamics
 from utils import utils
 from model import robot_def, robot_model_data
 from trajectory_optimization import traj_optimizer
+from identification import data_processing, identification
+import numpy as np
 
-def run(robot, trajectory, config):
-    trajopt_condition = 'load_robot_model_from_file'
-    if next((value for key, value in config if key == trajopt_condition), None) is False :
+
+def run(robot, trajectory, data, iden, config):
+
+    if config.create_robot_model_ is True :
 
         print("\nstep1: Robot Define -----------------------------------------------------")
         robot_define = robot_def.RobotDef(
             name=robot.name_, params=robot.dh_, dh_convention=robot.dh_convention_,
             friction_type=robot.friction_type_)
-
         print("\nstep2: Create Kinematic Chain -------------------------------------------")
-        geom = geometry.Geometry(robot_define, config)
-
+        geom = geometry.Geometry(robot_define, config.load_kinematic_from_file_)
         print("\nstep3: Create Dynamic Chain ---------------------------------------------")
-        dyn = dynamics.Dynamics(robot_define, geom, config)
-
+        dyn = dynamics.Dynamics(robot_define, geom, config.load_dynamic_from_file_)
         print("\nstep4: Save Robot Model -------------------------------------------------")
         robot_model = robot_model_data.RobotModel(dyn)
         utils.save_data(robot.model_folder_, robot.name_, robot_model)
 
     else:
-        print("\nstep1: Load Robot Model Skipping ...")
+        print("\nstep1: Robot Define Skipping ...")
         print("\nstep2: Create Kinematic Chain Skipping ...")
         print("\nstep3: Create Dynamic Chain Skipping ...")
         print("\nstep4: Save Robot Model Skipping ...")
@@ -32,9 +32,28 @@ def run(robot, trajectory, config):
     print("\nstep5: Load Robot Model -------------------------------------------------")
     robot_model = utils.load_data(robot.model_folder_, robot.name_)
 
-    print("\nstep6: Excitation Trajectory Optimization -------------------------------")
-    optimal_traj = traj_optimizer.TrajOptimizer(robot_model, trajectory.fourier_order_, trajectory.base_freq_,
-                                                joint_constraints=trajectory.joint_constraints_,
-                                                cartesian_constraints=trajectory.cartesian_constraints_)
+    if config.design_excitation_traj_ is True:
+        print("\nstep6: Excitation Trajectory Optimization -------------------------------")
+        optimal_traj = traj_optimizer.TrajOptimizer(robot_model, trajectory.fourier_order_, trajectory.base_freq_,
+                                                    joint_constraints=trajectory.joint_constraints_,
+                                                    cartesian_constraints=trajectory.cartesian_constraints_)
+        print("\nstep7: Save Excitation Trajectory ---------------------------------------")
+        utils.save_data(trajectory.traj_folder_, trajectory.traj_name, optimal_traj)
 
+    else:
+        print("\nstep6: Excitation Trajectory Optimization Skipping ...")
+        print("\nstep7: Save Excitation Trajectory Skipping ...")
+
+
+    if config.sample_data_process_ is True:
+        print("\nstep8: Sample Data Process  ---------------------------------------------")
+        processed = data_processing.DataProcessor(data, robot_model.base_num, robot_model.H_b_func)
+        data_processing.plot_and_save_trajectory_data(data.measured_data_file_, processed)
+
+        print("\nstep9: Parameters Identification ----------------------------------------")
+        identification.Identification(iden, robot_model, processed)
+
+
+    else:
+        print("\nstep8: Sample Data Process Skipping ...")
 

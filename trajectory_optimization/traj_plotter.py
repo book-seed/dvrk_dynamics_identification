@@ -1,24 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-
-# linestyles = [('solid',               (0, ())),
-#               ('densely dashed',      (0, (5, 1))),
-#               ('densely dotted', (0, (1, 1))),
-#
-#               ('loosely dashed', (0, (5, 10))),
-#               ('dashed', (0, (5, 5))),
-#
-#               ('loosely dashdotted', (0, (3, 10, 1, 10))),
-#               ('dashdotted', (0, (3, 5, 1, 5))),
-#               ('densely dashdotted', (0, (3, 1, 1, 1))),
-#
-#               ('loosely dashdotdotted', (0, (3, 10, 1, 10, 1, 10))),
-#               ('dashdotdotted', (0, (3, 5, 1, 5, 1, 5))),
-#               ('densely dashdotdotted', (0, (3, 1, 1, 1, 1, 1))),
-#               ('loosely dotted',      (0, (1, 10))),
-#               ('dotted',              (0, (1, 5)))]
-
 linestyles = [('solid',               (0, ())),
               ('solid',      (0, ())),
               ('solid', (0, ())),
@@ -43,7 +25,6 @@ class TrajPlotter:
         self._frame_traj = frame_traj
         self._const_frame_ind = const_frame_num
         self._coordinates = coordinates
-        #print(self._frame_traj)
 
     def plot_desired_traj(self, fourier_x, position_only=False):
         font_size_def = 15.0

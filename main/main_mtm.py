@@ -1,5 +1,8 @@
 import sys
 import os
+
+from identification.identification import Identification
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from main import entry
 import sympy
@@ -19,17 +22,14 @@ _pi = sympy.pi
 # qd -> coordinate for dvrk_ros package
 # qmd -> coordinate for the modeling joints
 # q -> coordinate for motors
-qd2 = q2
-qd3 = -q2 + q3
-qd4 = 0.6697*q2 - 0.6697*q3 + q4
 
 qmd1 = q1
-qmd2 = qd2
-qmd30 = qd3
-qmd31 = qd3 + qd2
-qmd32 = -qd3
+qmd2 = q2
+qmd30 = -q2 + q3
+qmd31 = q3
+qmd32 = q2 - q3
 qmd33 = q3
-qmd4 = qd4
+qmd4 = 0.6697*q2 - 0.6697*q3 + q4
 qmd5 = q5
 qmd6 = q6
 qmd7 = q7
@@ -91,37 +91,81 @@ robot = Robot(name_=model_name, model_folder_=model_folder, dh_=dh, dh_conventio
 # ------------------------- 激励轨迹定义 ---------------------------------------------------------------------------------
 
 trajectory_name = 'three_order_fourier_traj'
-
 optimal_traj_folder = '/data/' + model_name + '/optimal_traj/'
-
 base_freq = 0.1
-
 fourier_order = 6
-
 cartesian_constraints = []
-
-joint_constraints = [(qmd1,  deg2rad(-57),  deg2rad(29),  deg2rad(-160), deg2rad(160), deg2rad(-1000), deg2rad(1000)),
-                     (qmd2,  deg2rad(-10),  deg2rad(60),  deg2rad(-180), deg2rad(180), deg2rad(-1000), deg2rad(1000)),
-                     (qmd30, deg2rad(-30),  deg2rad(30),  deg2rad(-180), deg2rad(180), deg2rad(-1000), deg2rad(1000)),
-                     (qmd4,  deg2rad(-40),  deg2rad(195), deg2rad(-360), deg2rad(360), deg2rad(-1000), deg2rad(1000)),
-                     (qmd5,  deg2rad(-87),  deg2rad(180), deg2rad(-360), deg2rad(360), deg2rad(-1000), deg2rad(1000)),
-                     (qmd6,  deg2rad(-40),  deg2rad(38),  deg2rad(-360), deg2rad(360), deg2rad(-1000), deg2rad(1000)),
-                     (qmd7,  deg2rad(-460), deg2rad(450), deg2rad(-720), deg2rad(720), deg2rad(-1000), deg2rad(1000)),
-                     (qmd31, deg2rad(-9),   deg2rad(39),  deg2rad(-360), deg2rad(360), deg2rad(-1000), deg2rad(1000))]
+joint_constraints = [(qmd1,  deg2rad(-57),  deg2rad(29),  deg2rad(-160), deg2rad(160), deg2rad(-1600), deg2rad(1600)),
+                     (qmd2,  deg2rad(-10),  deg2rad(60),  deg2rad(-180), deg2rad(180), deg2rad(-1800), deg2rad(1800)),
+                     (qmd30, deg2rad(-30),  deg2rad(30),  deg2rad(-180), deg2rad(180), deg2rad(-1800), deg2rad(1800)),
+                     (qmd4,  deg2rad(-40),  deg2rad(195), deg2rad(-360), deg2rad(360), deg2rad(-3600), deg2rad(3600)),
+                     (qmd5,  deg2rad(-87),  deg2rad(180), deg2rad(-360), deg2rad(360), deg2rad(-3600), deg2rad(3600)),
+                     (qmd6,  deg2rad(-40),  deg2rad(38),  deg2rad(-360), deg2rad(360), deg2rad(-3600), deg2rad(3600)),
+                     (qmd7,  deg2rad(-460), deg2rad(450), deg2rad(-720), deg2rad(720), deg2rad(-7200), deg2rad(7200)),
+                     (qmd31, deg2rad(-9),   deg2rad(39),  deg2rad(-360), deg2rad(360), deg2rad(-3600), deg2rad(3600))]
 
 Excitation_Traj = namedtuple('Excitation_Traj',
                              ['traj_name_', 'traj_folder_', 'base_freq_', 'fourier_order_',
                               'joint_constraints_', 'cartesian_constraints_'])
-trajectory = Excitation_Traj(traj_name_=trajectory_name, traj_folder_=optimal_traj_folder,
-                             base_freq_=base_freq, fourier_order_=fourier_order,
-                             joint_constraints_=joint_constraints, cartesian_constraints_=cartesian_constraints)
+trajectory = Excitation_Traj(traj_name_=trajectory_name,
+                             traj_folder_=optimal_traj_folder,
+                             base_freq_=base_freq,
+                             fourier_order_=fourier_order,
+                             joint_constraints_=joint_constraints,
+                             cartesian_constraints_=cartesian_constraints)
+
+# ---------------------------- 采集数据处理 ------------------------------------------------------------------------------
+measured_data_folder = '/data/' + model_name + '/measured_traj/'
+traj_name = 'two_results'
+sample_freq = 200   # 数据采样频率
+cutoff_freq = 5 * trajectory.base_freq_ * trajectory.fourier_order_  # 低通滤波器截止频率
+cut_num = 200       # 数据掐头去尾
+filter_order = 6
+
+# 定义回调函数，从文件中读取数据后，根据模型要求，预先对数据进行个性化处理
+def data_pre_process_callback(pre_q, pre_dq, pre_tau):
+    q_ = pre_q
+    dq_ = pre_dq
+    tau_ = pre_tau
+    return q_, dq_, tau_
+
+Data_Process = namedtuple('Data_Process',
+                          ['measured_data_file_', 'sample_freq_', 'cutoff_freq_', 'filter_order_', 'cut_num_', 'callback_'])
+
+data = Data_Process(measured_data_file_=measured_data_folder + traj_name,
+                    sample_freq_=sample_freq,
+                    cutoff_freq_=cutoff_freq,
+                    filter_order_=filter_order,
+                    cut_num_=cut_num,
+                    callback_=data_pre_process_callback)
+
+# ---------------------------- 辨识策略定义 ------------------------------------------------------------------------------
+solver = 'OLS'      # Ordinary Least Square
+iden_res_folder = '/data/' + model_name + '/identification/'
+
+# 定义回调函数，根据需要处理采集的数据及辨识结果计算的数据
+def iden_res_callback(filt_q, filt_dq, filt_tau, iden_tau):
+    q_ = filt_q
+    dq_ = filt_dq
+    tau_ = filt_tau
+    iden_tau_ = iden_tau
+    return q_, dq_, tau_, iden_tau_
+
+Iden = namedtuple('Iden', ['solver_', 'iden_res_file_', 'callback_'])
+iden = Iden(solver_=solver, iden_res_file_=iden_res_folder + solver, callback_=iden_res_callback)
+
 
 # ------------------------- 选项配置 ------------------------------------------------------------------------------------
 
-config = [('load_kinematic_from_file', True),
-          ('load_dynamic_from_file', True),
-          ('load_robot_model_from_file', True)]
+Config = namedtuple('Config', ['load_kinematic_from_file_', 'load_dynamic_from_file_',
+                               'create_robot_model_', 'design_excitation_traj_', 'sample_data_process_'])
+
+config = Config(load_kinematic_from_file_=True,
+                load_dynamic_from_file_=True,
+                create_robot_model_=False,
+                design_excitation_traj_=False,
+                sample_data_process_=True)
 
 # ------------------------- 运行 ----------------------------------------------------------------------------------------
 
-entry.run(robot, trajectory, config)
+entry.run(robot, trajectory, data, iden, config)
