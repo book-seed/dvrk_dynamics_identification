@@ -130,19 +130,6 @@ class Dynamics:
 
         self.tau = tau
     
-    # @staticmethod  
-    # def _static_calc_Ln(num, rbt_def, geom, _g):
-    #     print("calculating the link kinetic energy of {}/{}".format(num, rbt_def.link_nums[-1]))
-    #     p_e_n = -rbt_def.m[num] * geom.p_c[num].dot(_g)  
-    #     k_e_n = 0
-    #     if rbt_def.use_inertia[num]:
-    #         k_e_n = rbt_def.m[num] * geom.v_cw[num].dot(geom.v_cw[num])/2 +\
-    #                    (geom.w_b[num].transpose() * rbt_def.I_by_Llm[num] * geom.w_b[num])[0, 0]/2
-    #         k_e_n = sympy.factor(sympy.expand(k_e_n) - sympy.expand(k_e_n * rbt_def.m[num]).subs(rbt_def.m[num], 0)/rbt_def.m[num])
-        
-    #     L_n = k_e_n - p_e_n
-    #     return k_e_n, L_n
-    
     @staticmethod  
     def _static_calc_Ln(m, use_inertia, I_by_Llm, p_c, v_cw, w_b, g):
         p_e_n = -m * p_c.dot(g)  
@@ -263,7 +250,8 @@ class Dynamics:
     def _calc_C(self):
         print("calculating C ...")
         subs_ddq2zero = [(ddq, 0) for ddq in self.rbt_def.dd_coordinates]
-        self.C = sympy.Matrix(self.tau).subs(subs_ddq2zero) - self.G
+        C = sympy.Matrix(self.tau).subs(subs_ddq2zero) - self.G
+        self.C, b = sympy.linear_eq_to_matrix(C, self.rbt_def.d_coordinates)
 
     @staticmethod
     def _static_calc_C(tau, rbt_def):
@@ -306,7 +294,8 @@ class Dynamics:
             if '_static_calc_G' in res_dict:
                 self.G = res_dict['_static_calc_G']
             if '_static_calc_C' in res_dict:
-                self.C = res_dict['_static_calc_C'] - self.G        
+                C = res_dict['_static_calc_C'] - self.G
+                self.C, b = sympy.linear_eq_to_matrix(C, self.rbt_def.d_coordinates)
         
     def _calc_base_param(self):
         print("calculating base parameter...")

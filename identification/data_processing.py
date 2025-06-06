@@ -1,19 +1,25 @@
 # This file is originally adopted from https://github.com/cdsousa/wam7_dyn_ident and modified by Yan Wang
-import os
+from pathlib import Path
 import numpy as np
 import scipy
 import pandas as pd
 import matplotlib.pyplot as plt
+from utils import utils
 from utils import diff
 import sympy
 
-# Demand: the format of file should be
+# 采集的数据的保存格式为：
 # q0, dq0 tau0, q1, dq1, tau1, ..., qn, dqn, taun
+# 处理后的数据的保存为csv,格式：(每行有 1 + 8 * dof)个元素
+# t, q0_raw, ..., qn_raw, q0_filter, ..., qn_filter，
+# dq0_raw, ..., dqn_raw, dq0_filter, ..., dqn_filter，
+# ddq0_raw, ..., ddqn_raw, ddq0_filter, ..., ddqn_filter，
+# tau0_raw, ..., taun_raw, tau0_filter, ..., taun_filter
 
 class DataProcessor:
-    def __init__(self, data, base_param_num, H_b_func):
+    def __init__(self, data, sample_traj_folder):
 
-        self._measured_data_file = data.measured_data_file_ + '.csv'
+        self._measured_data_file = Path(sample_traj_folder / data.sample_traj_name_).with_suffix(".csv")
         self._sample_freq = data.sample_freq_
         self._cutoff_freq = data.cutoff_freq_
         self._cut_num = data.cut_num_
@@ -22,9 +28,10 @@ class DataProcessor:
 
         self._load_trajectory_data()
         self._diff_and_filt_data()
+        self._plot_and_save_measured_data(data)
 
     def _load_trajectory_data(self):
-        f = np.array(pd.read_csv(os.path.dirname(os.getcwd())+self._measured_data_file, sep=',', header=None))
+        f = np.array(pd.read_csv(self._measured_data_file, sep=',', header=None))
         row, col = f.shape
         sample_num = row
         self.dof = int(col/3)
@@ -73,82 +80,71 @@ class DataProcessor:
         self.ddq_raw_cut = self.ddq_raw[self._cut_num:-self._cut_num, :]
         self.tau_raw_cut = self.tau_raw[self._cut_num:-self._cut_num, :]
 
+    def _plot_and_save_measured_data(self, data):
 
-def plot_and_save_trajectory_data(pic_path, data):
+        t = self.t_cut
+        q_raw = self.q_raw_cut
+        q_filter = self.q_filt_cut
+        dq_raw = self.dq_raw_cut
+        dq_filter = self.dq_filt_cut
+        ddq_raw = self.ddq_raw_cut
+        ddq_filter = self.ddq_filt_cut
+        tau_raw = self.tau_raw_cut
+        tau_filter = self.tau_filt_cut
+        
+        dof = q_raw.shape[1]
 
-    t = data.t_cut
-    q_raw = data.q_raw_cut
-    q_filter = data.q_filt_cut
-    dq_raw = data.dq_raw_cut
-    dq_filter = data.dq_filt_cut
-    ddq_raw = data.ddq_raw_cut
-    ddq_filter = data.ddq_filt_cut
-    tau_raw = data.tau_raw_cut
-    tau_filter = data.tau_filt_cut
+        # 合并所有数组
+        save_data = np.column_stack([t, q_raw, q_filter, dq_raw, dq_filter, ddq_raw, ddq_filter, tau_raw, tau_filter])
+        # 创建列名列表
+        columns = ['time']
+        prefixes = ['q_raw', 'q_filter', 'dq_raw', 'dq_filter', 'ddq_raw', 'ddq_filter', 'tau_raw', 'tau_filter']
+        for prefix in prefixes:
+            for i in range(dof):  # 假设每个变量有3个维度
+                columns.append(f'{prefix}_{i}')
+            
+        # 创建DataFrame并保存为CSV
+        file = Path(self._measured_data_file).parent / f"{data.sample_traj_name_}_processed.csv"
+        df = pd.DataFrame(save_data, columns=columns)
+        df.to_csv(file, index=False)  # 保留列名，不保留行索引  
 
-    dof = q_raw.shape[1]
+        # 验证保存的文件
+        print(f"数据已保存到{file}，包含 {len(columns)} 列和 {len(df)} 行")
+        
+        # 绘制每个变量的时间序列图
+        fig, axes = plt.subplots(dof, 4, figsize=(10,15))
+        fig.suptitle('trajectory data before and after processing', fontsize=18)
 
-    fig, axes = plt.subplots(dof, 4, figsize=(10,15))
+        top_labels = ['q', r'$\dot{q}$', r'$\ddot{q}$', r'$\tau$']
+        left_labels = [f'J{i+1}' for i in range(dof)]
 
-    fig.suptitle('trajectory data before and after filtering', fontsize=18)
+        for j, label in enumerate(top_labels):
+            axes[0, j].set_title(label, fontsize=14, pad=20)
 
-    top_labels = ['q', r'$\dot{q}$', r'$\ddot{q}$', r'$\tau$']
-    left_labels = [f'J{i+1}' for i in range(dof)]
+        for i, label in enumerate(left_labels):
+            axes[i, 0].set_ylabel(label, fontsize=14, rotation=0, labelpad=20)
 
-    for j, label in enumerate(top_labels):
-        axes[0, j].set_title(label, fontsize=14, pad=20)
+        # dq_raw, ddq_raw 的噪声比较大，可能会导致dq_filter, ddq_filter被过度压缩
+        for i in range(dof):
+            axes[i, 0].plot(t, q_raw[:, i])
+            axes[i, 0].plot(t, q_filter[:, i])
+            # axes[i, 1].plot(t, dq_raw[:, i])
+            axes[i, 1].plot(t, dq_filter[:, i])
+            # axes[i, 2].plot(t, ddq_raw[:, i])
+            axes[i, 2].plot(t, ddq_filter[:, i])
+            axes[i, 3].plot(t, tau_raw[:, i])
+            axes[i, 3].plot(t, tau_filter[:, i])
 
-    for i, label in enumerate(left_labels):
-        axes[i, 0].set_ylabel(label, fontsize=14, rotation=0, labelpad=20)
-
-    for i in range(dof):
-        axes[i, 0].plot(t, q_raw[:, i])
-        axes[i, 0].plot(t, q_filter[:, i])
-        # axes[i, 1].plot(t, dq_raw[:, i])
-        axes[i, 1].plot(t, dq_filter[:, i])
-        # axes[i, 2].plot(t, ddq_raw[:, i])
-        axes[i, 2].plot(t, ddq_filter[:, i])
-        axes[i, 3].plot(t, tau_raw[:, i])
-        axes[i, 3].plot(t, tau_filter[:, i])
-
-    plt.subplots_adjust(hspace=0.5, wspace=0.3)
-    plt.savefig(os.path.dirname(os.getcwd()) + pic_path + '.png', dpi=300)
-    # plt.show()
+        plt.subplots_adjust(hspace=0.6, wspace=0.4)
+        file = Path(self._measured_data_file).parent / f"{data.sample_traj_name_}_processed.png"
+        plt.savefig(file, dpi=300)
+        # plt.show()
 
 
 
 
 
-def plot_meas_pred_tau(t, tau_m, tau_p, joint_type, coordinates):
-    sample_num, dof = tau_m.shape
-    t = t - t[0]
 
-    fig = plt.figure()
-
-    # font_size_def = 9.0
-    font_size_def = 14.0
-
-    for i in range(dof):
-        plt_tau = fig.add_subplot(dof, 1, i + 1)
-        plt_tau.margins(x=0.002, y=0.02)
-        plt_tau.plot(t, tau_m[:, i], 'r', label="Measured", linewidth=1)
-        plt_tau.plot(t, tau_p[:, i], 'b', label="Predicted", linewidth=1)
-        plt_tau.plot(t, tau_p[:, i] - tau_m[:, i], 'k--', label="Error", linewidth=1)
-        zeros = np.zeros(tau_p[:, i].shape)
-        # plt_tau.plot(t, zeros, color='0.5', linewidth=0.75)
-        if i == dof-1:
-            plt_tau.set_xlabel(r'$t$ (s)', fontsize=font_size_def)
-        if joint_type[i] == 'R':
-            plt_tau.set_ylabel(r'$\tau^m_{}$ (Nm)'.format(coordinates[i].name[1:]), fontsize=font_size_def)
-        else:
-            plt_tau.set_ylabel(r'$f^m_{}$ (N)'.format(coordinates[i].name[1:], fontsize=font_size_def))
-        # plt_tau.legend(['Measured', "Predicted"])
-        if i == 0:
-            plt_tau.legend(bbox_to_anchor=(0.0, 1.60, 1.0, .102), loc='upper center', ncol=3,
-                           mode="expand", borderaxespad=0., fontsize=font_size_def)
-        plt_tau.tick_params(labelsize=font_size_def)
-    plt.tight_layout()
-    plt.show()
 
 
 def plot_meas_2pred_tau(t, tau_m, tau_p1, tau_p2, joint_type, coordinates):

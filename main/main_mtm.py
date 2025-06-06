@@ -1,8 +1,5 @@
 import sys
 import os
-
-from identification.identification import Identification
-
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from main import entry
 import sympy
@@ -114,58 +111,67 @@ trajectory = Excitation_Traj(traj_name_=trajectory_name,
                              joint_constraints_=joint_constraints,
                              cartesian_constraints_=cartesian_constraints)
 
-# ---------------------------- 采集数据处理 ------------------------------------------------------------------------------
-measured_data_folder = '/data/' + model_name + '/measured_traj/'
-traj_name = 'two_results'
+############################################################################
+#----------------------------- 采样数据处理 ---------------------------------#
+############################################################################
+
+sample_traj_name = 'two_results'
 sample_freq = 200   # 数据采样频率
 cutoff_freq = 5 * trajectory.base_freq_ * trajectory.fourier_order_  # 低通滤波器截止频率
 cut_num = 200       # 数据掐头去尾
 filter_order = 6
 
-# 定义回调函数，从文件中读取数据后，根据模型要求，预先对数据进行个性化处理
+# 定义回调函数，从文件中读取数据后，根据模型要求，预先对数据进行处理
 def data_pre_process_callback(pre_q, pre_dq, pre_tau):
-    q_ = pre_q
-    dq_ = pre_dq
-    tau_ = pre_tau
-    return q_, dq_, tau_
+    return pre_q, pre_dq, pre_tau
 
-Data_Process = namedtuple('Data_Process',
-                          ['measured_data_file_', 'sample_freq_', 'cutoff_freq_', 'filter_order_', 'cut_num_', 'callback_'])
+Sample_Data_Process = namedtuple('Sample_Data_Process',[
+    'sample_traj_name_',
+    'sample_freq_',
+    'cutoff_freq_',
+    'filter_order_',
+    'cut_num_',
+    'callback_'])
+sample_data = Sample_Data_Process(
+    sample_traj_name_ = sample_traj_name,
+    sample_freq_=sample_freq,
+    cutoff_freq_=cutoff_freq,
+    filter_order_=filter_order,
+    cut_num_=cut_num,
+    callback_=data_pre_process_callback)
 
-data = Data_Process(measured_data_file_=measured_data_folder + traj_name,
-                    sample_freq_=sample_freq,
-                    cutoff_freq_=cutoff_freq,
-                    filter_order_=filter_order,
-                    cut_num_=cut_num,
-                    callback_=data_pre_process_callback)
+############################################################################
+#------------------------------ 辨识策略 -----------------------------------#
+############################################################################
 
-# ---------------------------- 辨识策略定义 ------------------------------------------------------------------------------
-solver = 'OLS'      # Ordinary Least Square
-iden_res_folder = '/data/' + model_name + '/identification/'
-
-# 定义回调函数，根据需要处理采集的数据及辨识结果计算的数据
+# 是否需要重新生成Wb (如果机器人模型未变，采样数据未变，求解器未变，Wb存在的情况下，无需重新生成Wb)
+gen_regressor = False
+# 求解器定义，可选的求解器有
+# --OLS (Ordinary Least Square)
+# --WLS (Wight Least Square)
+# --CVX (Convex Optimization)
+solver = 'CVX'
+# 定义回调函数，根据需要处理辨识前后的数据
 def iden_res_callback(filt_q, filt_dq, filt_tau, iden_tau):
-    q_ = filt_q
-    dq_ = filt_dq
-    tau_ = filt_tau
-    iden_tau_ = iden_tau
-    return q_, dq_, tau_, iden_tau_
+    return filt_q, filt_dq, filt_tau, iden_tau
 
-Iden = namedtuple('Iden', ['solver_', 'iden_res_file_', 'callback_'])
-iden = Iden(solver_=solver, iden_res_file_=iden_res_folder + solver, callback_=iden_res_callback)
+Iden = namedtuple('Iden', ['gen_regressor_', 'solver_', 'callback_'])
+iden = Iden(gen_regressor_=gen_regressor, solver_=solver, callback_=iden_res_callback)
 
-
-# ------------------------- 选项配置 ------------------------------------------------------------------------------------
-
+############################################################################
+#------------------------------ 选项配置 -----------------------------------#
+############################################################################
 Config = namedtuple('Config', ['load_kinematic_from_file_', 'load_dynamic_from_file_',
-                               'create_robot_model_', 'design_excitation_traj_', 'sample_data_process_'])
+                               'create_robot_model_', 'design_excitation_traj_', 'sample_data_process_',
+                               'dynamics_identification_'])
 
 config = Config(load_kinematic_from_file_=True,
                 load_dynamic_from_file_=True,
                 create_robot_model_=False,
                 design_excitation_traj_=False,
-                sample_data_process_=True)
+                sample_data_process_=False,
+                dynamics_identification_=True)
 
 # ------------------------- 运行 ----------------------------------------------------------------------------------------
 
-entry.run(robot, trajectory, data, iden, config)
+entry.run(robot, trajectory, sample_data, iden, config)

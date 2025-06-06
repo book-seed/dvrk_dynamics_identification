@@ -50,7 +50,7 @@ class RobotDef:
         self._gen_params()
         self._dyn_params()
         self._gen_coordinates()
-        # self._print()
+        self._print()
 
     def _gen_coordinates(self):
         self.coordinates = []
@@ -195,6 +195,7 @@ class RobotDef:
                 self.std_params += [self.K[num]]
 
     def _print(self):
+        print("dh_T = {}".format(self.dh_T))
         print("dq_for_frame = {}".format(self.dq_for_frame))
         print("ddq_for_frame = {}".format(self.ddq_for_frame))
         print("coordinates_joint_type = {}".format(self.coordinates_joint_type))

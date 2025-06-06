@@ -188,7 +188,7 @@ else:
 	states = motor_state
 
 # Save data
-data_file_dir = './data/' + model_name + '/measured_traj/' + testname + '_results.csv'
+data_file_dir = './data/' + model_name + '/sample_traj/' + testname + '_results.csv'
 
 if not os.path.exists(os.path.dirname(data_file_dir)):
 	try:

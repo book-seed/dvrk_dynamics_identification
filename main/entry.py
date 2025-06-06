@@ -1,3 +1,4 @@
+from pathlib import Path
 from kinematics import geometry
 from dynamics import dynamics
 from utils import utils
@@ -8,6 +9,14 @@ import numpy as np
 
 
 def run(robot, trajectory, data, iden, config):
+
+    # 是否需要计算或加载机器人模型
+    request_robot_model_ = config.design_excitation_traj_ or config.dynamics_identification_
+    
+    # 数据保存路径
+    model_folder_ = Path.cwd().parent / 'data' / robot.name_ / 'model'
+    sample_traj_folder_ = Path.cwd().parent / 'data' / robot.name_ / 'sample_traj'
+    identification_folder_ = Path.cwd().parent / 'data' / robot.name_ / 'identification'
 
     if config.create_robot_model_ is True :
 
@@ -29,31 +38,40 @@ def run(robot, trajectory, data, iden, config):
         print("\nstep3: Create Dynamic Chain Skipping ...")
         print("\nstep4: Save Robot Model Skipping ...")
 
-    print("\nstep5: Load Robot Model -------------------------------------------------")
-    robot_model = utils.load_data(robot.model_folder_, robot.name_)
+    robot_model = None
+    if request_robot_model_ is True:
+        print("\nstep5: Load Robot Model -------------------------------------------------")
+        robot_model = utils.load_data(model_folder_, robot.name_)
+    else:
+        print("\nstep5: Load Robot Model Skipping ...")
 
     if config.design_excitation_traj_ is True:
         print("\nstep6: Excitation Trajectory Optimization -------------------------------")
         optimal_traj = traj_optimizer.TrajOptimizer(robot_model, trajectory.fourier_order_, trajectory.base_freq_,
                                                     joint_constraints=trajectory.joint_constraints_,
                                                     cartesian_constraints=trajectory.cartesian_constraints_)
-        print("\nstep7: Save Excitation Trajectory ---------------------------------------")
         utils.save_data(trajectory.traj_folder_, trajectory.traj_name, optimal_traj)
-
     else:
         print("\nstep6: Excitation Trajectory Optimization Skipping ...")
-        print("\nstep7: Save Excitation Trajectory Skipping ...")
-
 
     if config.sample_data_process_ is True:
-        print("\nstep8: Sample Data Process  ---------------------------------------------")
-        processed = data_processing.DataProcessor(data, robot_model.base_num, robot_model.H_b_func)
-        data_processing.plot_and_save_trajectory_data(data.measured_data_file_, processed)
-
-        print("\nstep9: Parameters Identification ----------------------------------------")
-        identification.Identification(iden, robot_model, processed)
-
-
+        print("\nstep7: Sample Data Process  ---------------------------------------------")
+        data_processing.DataProcessor(data, sample_traj_folder_)
     else:
-        print("\nstep8: Sample Data Process Skipping ...")
+        print("\nstep7: Sample Data Process Skipping ...")
+
+    if config.dynamics_identification_ is True:
+        print("\nstep8: Dynamics_Parameters Identification -------------------------------")
+        # 辨识前数据预处理(耗时操作)
+        regressor_matrix_file_name = f"regressor_matrix"
+        if iden.gen_regressor_ is True:
+            sample_traj_processed = sample_traj_folder_ / f"{data.sample_traj_name_}_processed.csv"
+            pre = identification.IdenPreDeal(iden, robot_model, sample_traj_processed)
+            utils.save_data(identification_folder_, regressor_matrix_file_name, pre)
+        regressor = utils.load_data(identification_folder_, regressor_matrix_file_name)
+        identification.Identification(iden, regressor, robot_model, identification_folder_)
+
+
+
+       
 

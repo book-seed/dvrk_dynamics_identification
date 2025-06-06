@@ -1,7 +1,7 @@
 import sympy
 import numpy as np
 import cloudpickle as pickle
-import os
+from pathlib import Path
 import errno
 import csv
 
@@ -150,34 +150,22 @@ def gen_DLki_mat4():
 '''
 
 def save_data(folder, name, data):
-    model_file = os.path.dirname(os.getcwd()) + folder + name + '.pkl'
-    if not os.path.exists(os.path.dirname(model_file)):
-        try:
-            os.makedirs(os.path.dirname(model_file))
-        except OSError as exc:
-            if exc.errno != errno.EEXIST:
-                raise
+    model_file = Path(folder) /f"{name}.pkl"
+    Path(model_file.parent).mkdir(parents=True, exist_ok=True)
 
     with open(model_file, 'wb') as f:
         pickle.dump(data, f)
 
 
 def load_data(folder, name):
-    model_file = os.path.dirname(os.getcwd()) + folder + name + '.pkl'
-    if os.path.exists(model_file):
+    model_file = Path(folder) /f"{name}.pkl"
+    if Path.exists(model_file):
         data = pickle.load(open(model_file, 'rb'))
         return data
     else:
         raise Exception("No {} can be found!".format(model_file))
 
 
-
-
-def save_csv_data(folder, name, data):
-    with open(folder + name + '.csv', 'wb') as my_file:
-        wr = csv.writer(my_file, quoting=csv.QUOTE_NONE)
-        for i in range(np.size(data, 0) - 10):
-            wr.writerow(data[i])
 
 
 
