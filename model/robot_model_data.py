@@ -32,6 +32,8 @@ class RobotModel:
         self.H_b = dyn.H_b
         self.H_b_func = dyn.H_b_func
 
+        self.tau = dyn.tau
+
         self.frame_num = dyn.rbt_def.frame_num
         self.use_inertia = dyn.rbt_def.use_inertia
         self.use_friction = dyn.rbt_def.use_friction

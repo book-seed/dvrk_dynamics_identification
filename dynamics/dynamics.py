@@ -1,6 +1,9 @@
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 import sympy
 import numpy as np
-from dynamics.dyn_param_dep import find_dyn_parm_deps
+from dyn_param_dep import find_dyn_parm_deps
 import copy
 import time
 from utils import utils
@@ -14,10 +17,10 @@ ForkingPickler.dumps = dill.dumps
 
 
 class Dynamics:
-    def __init__(self, rbt_def, geom, load_data_from_file, g=[0, 0, -9.81]):
+    def __init__(self, rbt_def, geom, model_folder, load_data_from_file, g=[0, 0, -9.81]):
 
         self.rbt_def = rbt_def
-        self.model_folder = '/data/' + self.rbt_def.name + '/model/'
+        self.model_folder = model_folder
         self.geom = geom
         self._g = np.matrix(g)
 
@@ -41,22 +44,22 @@ class Dynamics:
             # print(f'err_C: {err_C}')
             # print(f'err_G: {err_G}')
         else:
-            start_time = time.time()
-            self.tau = self._multi_process_calc_dyn()
-            print("_multi_process_calc_dyn calc dynamic finished. Cost Time: {} seconds".format(round(time.time() - start_time, 6)))
-            start_time = time.time()
-            self._multi_process_calc_H_MCG()
-            print("_multi_process_calc_HMCG Cost Time: {} seconds".format(round(time.time() - start_time, 6)))
-            self._save_data()
+            # start_time = time.time()
+            # self.tau = self._multi_process_calc_dyn()
+            # print("_multi_process_calc_dyn calc dynamic finished. Cost Time: {} seconds".format(round(time.time() - start_time, 6)))
+            # start_time = time.time()
+            # self._multi_process_calc_H_MCG()
+            # print("_multi_process_calc_HMCG Cost Time: {} seconds".format(round(time.time() - start_time, 6)))
+            # self._save_data()
             
             # 单进程
-            # start_time = time.time()
-            # self._calc_dyn()
-            # print("_calc_dyn calc dynamic finished. Cost Time: {} seconds".format(round(time.time() - start_time, 6)))
-            # start_time = time.time()
-            # self._calc_H_MCG()
-            # print("_calc_HMCG Cost Time: {} seconds".format(round(time.time() - start_time, 6)))
-            # self._save_data_sp()
+            start_time = time.time()
+            self._calc_dyn()
+            print("_calc_dyn calc dynamic finished. Cost Time: {} seconds".format(round(time.time() - start_time, 6)))
+            start_time = time.time()
+            self._calc_H_MCG()
+            print("_calc_HMCG Cost Time: {} seconds".format(round(time.time() - start_time, 6)))
+            self._save_data_sp()
 
         self._calc_H_func()
         self._calc_base_param()
@@ -250,8 +253,7 @@ class Dynamics:
     def _calc_C(self):
         print("calculating C ...")
         subs_ddq2zero = [(ddq, 0) for ddq in self.rbt_def.dd_coordinates]
-        C = sympy.Matrix(self.tau).subs(subs_ddq2zero) - self.G
-        self.C, b = sympy.linear_eq_to_matrix(C, self.rbt_def.d_coordinates)
+        self.C = sympy.Matrix(self.tau).subs(subs_ddq2zero) - self.G
 
     @staticmethod
     def _static_calc_C(tau, rbt_def):
@@ -294,8 +296,8 @@ class Dynamics:
             if '_static_calc_G' in res_dict:
                 self.G = res_dict['_static_calc_G']
             if '_static_calc_C' in res_dict:
-                C = res_dict['_static_calc_C'] - self.G
-                self.C, b = sympy.linear_eq_to_matrix(C, self.rbt_def.d_coordinates)
+                self.C = res_dict['_static_calc_C'] - self.G
+                # self.C, b = sympy.linear_eq_to_matrix(C, self.rbt_def.d_coordinates)
         
     def _calc_base_param(self):
         print("calculating base parameter...")

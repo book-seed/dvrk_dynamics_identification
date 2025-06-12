@@ -34,7 +34,7 @@ speed = 0.4
 model_folder = 'data/' + model_name + '/model/'
 robot_model = load_data(model_folder, model_name)
 
-trajectory_folder = 'data/' + model_name + '/optimal_trajectory/'
+trajectory_folder = 'data/' + model_name + '/excitation_trajectory/'
 
 p = dvrk.mtm(robot_name)
 p.home()

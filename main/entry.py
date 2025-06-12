@@ -5,7 +5,8 @@ from utils import utils
 from model import robot_def, robot_model_data
 from trajectory_optimization import traj_optimizer
 from identification import data_processing, identification
-import numpy as np
+from codegen import robotcode
+
 
 
 def run(robot, trajectory, data, iden, config):
@@ -15,7 +16,7 @@ def run(robot, trajectory, data, iden, config):
     
     # 数据保存路径
     model_folder_ = Path.cwd().parent / 'data' / robot.name_ / 'model'
-    sample_traj_folder_ = Path.cwd().parent / 'data' / robot.name_ / 'sample_traj'
+    sample_traj_folder_ = Path.cwd().parent / 'data' / robot.name_ / 'sample_trajectory'
     identification_folder_ = Path.cwd().parent / 'data' / robot.name_ / 'identification'
 
     if config.create_robot_model_ is True :
@@ -25,12 +26,12 @@ def run(robot, trajectory, data, iden, config):
             name=robot.name_, params=robot.dh_, dh_convention=robot.dh_convention_,
             friction_type=robot.friction_type_)
         print("\nstep2: Create Kinematic Chain -------------------------------------------")
-        geom = geometry.Geometry(robot_define, config.load_kinematic_from_file_)
+        geom = geometry.Geometry(robot_define, model_folder_, config.load_kinematic_from_file_)
         print("\nstep3: Create Dynamic Chain ---------------------------------------------")
-        dyn = dynamics.Dynamics(robot_define, geom, config.load_dynamic_from_file_)
+        dyn = dynamics.Dynamics(robot_define, geom, model_folder_, config.load_dynamic_from_file_)
         print("\nstep4: Save Robot Model -------------------------------------------------")
         robot_model = robot_model_data.RobotModel(dyn)
-        utils.save_data(robot.model_folder_, robot.name_, robot_model)
+        utils.save_data(model_folder_, robot.name_, robot_model)
 
     else:
         print("\nstep1: Robot Define Skipping ...")
@@ -44,6 +45,13 @@ def run(robot, trajectory, data, iden, config):
         robot_model = utils.load_data(model_folder_, robot.name_)
     else:
         print("\nstep5: Load Robot Model Skipping ...")
+
+    print(robot_model.H_b)
+
+    robotcode.CodeGen(robot_model)
+
+
+
 
     if config.design_excitation_traj_ is True:
         print("\nstep6: Excitation Trajectory Optimization -------------------------------")

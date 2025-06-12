@@ -1,7 +1,14 @@
-import scipy
-N = 5
-Wn = 0.5
-b = scipy.signal.butter(N, Wn, btype='low', analog=False, output='ba')
 
-print(b[0])
-print(b[1])
+def function(a_, b_):
+    tmp = a_
+    a_ = b_
+    b_ = tmp
+    print(a_, b_)
+
+
+
+if __name__ == '__main__':
+    a = 10
+    b = 100
+    function(a,b)
+    print(a, b)

@@ -48,7 +48,7 @@ model_folder = 'data/' + model_name + '/model/'
 robot_model = load_data(model_folder,model_name)
 
 
-trajectory_folder = 'data/' + model_name +'/optimal_trajectory/'
+trajectory_folder = 'data/' + model_name +'/excitation_trajectory/'
 dof, fourier_order, base_freq, traj_optimizer_result, reg_norm_mat = load_data(trajectory_folder, trajectory_name)
 print (traj_optimizer_result.shape)
 print (dof)
@@ -188,7 +188,7 @@ else:
 	states = motor_state
 
 # Save data
-data_file_dir = './data/' + model_name + '/sample_traj/' + testname + '_results.csv'
+data_file_dir = './data/' + model_name + '/sample_trajectory/' + testname + '_results.csv'
 
 if not os.path.exists(os.path.dirname(data_file_dir)):
 	try:

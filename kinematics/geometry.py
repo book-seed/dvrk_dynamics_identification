@@ -1,6 +1,4 @@
 import sympy
-import numpy as np
-from kinematics.frame_drawer import FrameDrawer
 from utils import utils
 import time
 import multiprocessing
@@ -21,10 +19,10 @@ else:
 
 
 class Geometry:
-    def __init__(self, rbt_def, load_data_from_file):
+    def __init__(self, rbt_def, model_folder, load_data_from_file):
         
         self.rbt_def = rbt_def
-        self.model_folder = '/data/' + self.rbt_def.name + '/model/'
+        self.model_folder = model_folder
 
         self.T_0n = list(sympy.simplify(range(self.rbt_def.frame_num)))
         self.p_n = list(sympy.simplify(range(self.rbt_def.frame_num)))
@@ -66,7 +64,8 @@ class Geometry:
         t = sympy.symbols('t')
         v_cw = sympy.diff(p_c.subs(rbt_def.subs_q2qt), t)
         v_cw = v_cw.subs(rbt_def.subs_dqt2dq + rbt_def.subs_qt2q)
-        v_cw = sympy.simplify(v_cw) 
+        # v_cw = sympy.simplify(v_cw)
+        v_cw = v_cw.applyfunc(lambda x: sympy.trigsimp(x))
         print(f'frame {num}: calc v_cw finished')
         return v_cw
         
@@ -75,7 +74,8 @@ class Geometry:
         R_t = R.subs(rbt_def.subs_q2qt)
         dR_t = sympy.diff(R_t)
         dR = dR_t.subs(rbt_def.subs_dqt2dq + rbt_def.subs_qt2q)
-        w_b = sympy.simplify(utils.so32vec(R.transpose() * dR))
+        # w_b = sympy.simplify(utils.so32vec(R.transpose() * dR))
+        w_b = (utils.so32vec(R.transpose() * dR)).applyfunc(lambda x: sympy.trigsimp(x))
         print(f'frame {num}: calc w_b finished')
         return w_b
     
@@ -95,7 +95,7 @@ class Geometry:
             self.T_0n[num] = self.T_0n[self.rbt_def.prev_link_num[num]] * self.rbt_def.dh_T[num]
             self.R[num] = self.T_0n[num][0:3, 0:3]
             self.p_n[num] = self.T_0n[num][0:3, 3]
-            self.T_0nc[num] = sympy.sympify(self.T_0n[num] * utils.translation_transmat(self.rbt_def.r_by_ml[num]))
+            self.T_0nc[num] = self.T_0n[num] * utils.translation_transmat(self.rbt_def.r_by_ml[num])
             self.p_c[num] = self.T_0nc[num][0:3, 3]
             
         pool = multiprocessing.Pool(processes=multiprocessing.cpu_count())
@@ -133,12 +133,14 @@ class Geometry:
             
             v_cw = sympy.diff(self.p_c[num].subs(self.rbt_def.subs_q2qt), t)
             v_cw = v_cw.subs(self.rbt_def.subs_dqt2dq + self.rbt_def.subs_qt2q)
-            self.v_cw[num] = sympy.simplify(v_cw)
+            # self.v_cw[num] = sympy.simplify(v_cw)
+            self.v_cw[num] = v_cw.applyfunc(lambda x: sympy.trigsimp(x))
 
             R_t = self.R[num].subs(self.rbt_def.subs_q2qt)
             dR_t = sympy.diff(R_t)
             dR = dR_t.subs(self.rbt_def.subs_dqt2dq + self.rbt_def.subs_qt2q)
-            self.w_b[num] = sympy.simplify(utils.so32vec(self.R[num].transpose() * dR))
+            # self.w_b[num] = sympy.simplify(utils.so32vec(self.R[num].transpose() * dR))
+            self.w_b[num] = (utils.so32vec(self.R[num].transpose() * dR)).applyfunc(lambda x: sympy.trigsimp(x))
    
 
     def _calc_functions(self):
@@ -148,28 +150,6 @@ class Geometry:
 
         for num in range(self.rbt_def.frame_num):
             self.p_n_func[num] = sympy.lambdify(input_vars, self.p_n[num])
-
-
-    def draw_geom(self, angle=0):
-        frame_drawer = FrameDrawer((-0.6, 0.6), (-0.4, 0.4), (-0.7, 0.7))
-
-        if angle == 0:
-            subs_q2zero = [(q, angle) for q in self.rbt_def.coordinates]
-        else :
-            subs_q2zero = []
-            x = self.rbt_def.coordinates
-            for i in range(len(x)):
-                subs_q2zero.append((x[i], angle[i]))
-
-        for num in self.rbt_def.link_nums:
-            T = np.matrix(self.T_0n[num].subs(subs_q2zero))
-            frame_drawer.draw_frame(T, num)
-            #print(T[0:3, 3])
-            if num != 0:
-                T_prev = np.matrix(self.T_0n[self.rbt_def.prev_link_num[num]].subs(subs_q2zero))
-                frame_drawer.drawSegment(T_prev, T)
-
-        frame_drawer.show()
 
     def _save_data(self):
         data = [('T_0n', self.T_0n),

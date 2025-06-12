@@ -6,8 +6,6 @@ import time
 import matplotlib.pyplot as plt
 import sympy as sp
 import cvxpy
-from cvxpy.expressions.cvxtypes import problem
-from pexpect.screen import constrain
 
 TrajData = namedtuple('TrajData', [
     't', 'q_raw', 'q_filter','dq_raw', 'dq_filter',
@@ -98,7 +96,6 @@ class Identification:
         def solve_wls():
             weight = (np.max(regressor.traj_data.tau_filter, axis=0)
                       - np.min(regressor.traj_data.tau_filter, axis=0))
-            # repeat the weight to generate a large vector for all the data
             weights = 1.0 / np.tile(weight, int(regressor.Wb.shape[0]/weight.shape[0]))
             Wb_wls = np.multiply(regressor.Wb, np.asmatrix(weights).transpose())
             tau_s_wls = np.multiply(regressor.tau_s, weights)

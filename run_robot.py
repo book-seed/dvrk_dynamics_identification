@@ -29,7 +29,7 @@ scales = np.array([1, 0.8, 0.8])
 stable_time = 5
 
 
-name = './data/' + modelname + '/optimal_trajectory/' + testname
+name = './data/' + modelname + '/excitation_trajectory/' + testname
 q = genfromtxt(name + '.csv', delimiter=',')
 
 
@@ -122,7 +122,7 @@ while i < len(a) and not rospy.is_shutdown():
 
 
 # Save data
-data_file_dir = './data/' + modelname + '/sample_traj/' + testname + '_results.csv'
+data_file_dir = './data/' + modelname + '/sample_trajectory/' + testname + '_results.csv'
 
 if not os.path.exists(os.path.dirname(data_file_dir)):
     try:

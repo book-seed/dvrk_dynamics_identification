@@ -76,6 +76,7 @@ class RobotDef:
         self.subs_dqt2dq = [(dqt, dq) for dq, dqt in zip(self.d_coordinates, self.d_coordinates_t)]
         self.subs_ddqt2ddq = [(ddqt, ddq) for ddq, ddqt in zip(self.dd_coordinates, self.dd_coordinates_t)]
 
+        self.q_for_frame = list(range(self.frame_num))
         self.dq_for_frame = list(range(self.frame_num))
         self.ddq_for_frame = list(range(self.frame_num))
 
@@ -91,6 +92,7 @@ class RobotDef:
             dqt = sympy.diff(qt, sympy.Symbol('t'))
             dq = dqt.subs(self.subs_dqt2dq)
 
+            self.q_for_frame[i] = q
             self.dq_for_frame[i] = dq
 
             ddqt = sympy.diff(dqt, sympy.Symbol('t'))
@@ -113,19 +115,19 @@ class RobotDef:
                 self.joint_type.append("A")  # Assitive
 
     def _gen_params(self):
-        self.m = list(range(self.frame_num))                # mass
-        self.l = list(range(self.frame_num))                # the first moment of inertia vector (惯性矩向量)
-        self.r = list(range(self.frame_num))                #
-        self.L_vec = list(range(self.frame_num))            # inertia tensor vector in link frame
-        self.I_vec = list(range(self.frame_num))            # inertia tensor vector in COM frame
-        self.L_mat = list(range(self.frame_num))            # inertia tensor matrix in link frame
-        self.I_mat = list(range(self.frame_num))            # inertia tensor matrix in com frame
+        self.m = [0] * self.frame_num                # mass
+        self.l = [0] * self.frame_num                # the first moment of inertia vector (惯性矩向量)
+        self.r = [0] * self.frame_num                #
+        self.L_vec = [0] * self.frame_num            # inertia tensor vector in link frame
+        self.I_vec = [0] * self.frame_num            # inertia tensor vector in COM frame
+        self.L_mat = [0] * self.frame_num            # inertia tensor matrix in link frame
+        self.I_mat = [0] * self.frame_num            # inertia tensor matrix in com frame
 
-        self.Fc = list(range(self.frame_num))               # coulomb friction
-        self.Fv = list(range(self.frame_num))               # viscous friction
-        self.Fo = list(range(self.frame_num))               # offset friction
-        self.Ia = list(range(self.frame_num))
-        self.K = list(range(len(self.spring_dl)))
+        self.Fc = [0] * self.frame_num               # coulomb friction
+        self.Fv = [0] * self.frame_num               # viscous friction
+        self.Fo = [0] * self.frame_num               # offset friction
+        self.Ia = [0] * self.frame_num
+        self.K = [0] * len(self.spring_dl)
         self.spring_num = 0
 
         # processing variables
@@ -151,6 +153,7 @@ class RobotDef:
                 self.Fv[num] = utils.new_sym('Fv' + str(num))
             if 'offset' in self.friction_type:
                 self.Fo[num] = utils.new_sym('Fo' + str(num))
+
 
             if self.use_Ia[num]:
                 self.Ia[num] = utils.new_sym('Ia' + str(num))
