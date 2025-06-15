@@ -5,7 +5,7 @@
 
 #include <cmath>
 
-void get_tau_function(const double* q, const double* dq, const double* ddq, const double* p, double* results) {
+void get_G_function(const double* q, const double* dq, const double* ddq, const double* p, double* results) {
 
     //符号变量
     const double q0 = q[0];
@@ -26,16 +26,7 @@ void get_tau_function(const double* q, const double* dq, const double* ddq, cons
     const double p7 = params[7];
 
     //公共子表达式
-    double x0 = sin(q1);
-    double x1 = cos(q1);
-    double x2 = pow(dq1, 2);
-    double x3 = 2*q1;
-    double x4 = sin(x3);
-    double x5 = cos(x3);
-    double x6 = 2*dq0*dq1;
-    double x7 = (1.0/2.0)*p5;
-    double x8 = pow(dq0, 2);
     
-    results[0] = ddq0*p7 + p2*(ddq0*x4 + x5*x6) + p3*(ddq1*x1 - x0*x2) + p4*(ddq1*x0 + x1*x2) + x7*(-ddq0*x5 + ddq0 + x4*x6);
-    results[1] = ddq0*p3*x1 + ddq0*p4*x0 + ddq1*p6 - 9.8100000000000005*p0*x0 + 9.8100000000000005*p1*x1 - p2*x5*x8 - x4*x7*x8;
+    results[0] = 0;
+    results[1] = -9.8100000000000005*p0*sin(q1) + 9.8100000000000005*p1*cos(q1);
 }

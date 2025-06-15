@@ -1,54 +1,40 @@
-# A dynamic model identification package for the da Vinci Research Kit (under development)
+# 机器人动力学参数辨识库
 
-There are parallelograms, springs, tendon couplings, cables, and counterweight in da Vinci Research Kit (dVRK)
-so that we can not use existing tools to identify the dynamic parameters of it.
-This software framework was developed to solve these problems.
-Although this package was initially developed for the dVRK, it is also very easy to use it to identify the dynamic
-parameters of other robots.
+## 1. 简介
+### 1.1 模型定义  
+* SDH/MDH
+* 摩擦力模型，当前仅支持库伦摩擦，粘滞摩擦，及定量偏置
+* 可添加弹簧
+### 1.2 运动学建模
+* 正常计算，没啥说的
+### 1.3 动力学建模
+- 基于拉格朗日法的动力学方程
+- MCG方程
+- 动力学方程线性化
+- 基于QR分解的最小参数集
+- C/C++代码生成
+### 1.4 激励轨迹设计
+- 自定义级数的傅里叶激励轨迹设计
+- 基于教学算法的激励轨迹设计（待完成）
+- 李萨如激励轨迹设计（适用于静态辨识）（待完成）
+### 1.5 采样数据处理
+- 可自定义数据预处理
+- 零相位差低通滤波器 (Zero-phase low-pass filter)
+### 1.6 参数辨识
+- 普通最小二乘法 (Ordinary Least Square, OLS)
+- 基于权重的最小二乘法 (Weighted Least Square, WLS)
+- 凸优化算法 (Convex Optimization)
+- 辨识结果保存为CSV文件
 
-
-## Procedure
-
-<p align="center">
-  <img src="design/workflow.png" width="500" title="hover text">
-</p>
-
-## Features
-### Finished
-* Symbolic dynamic modelling based on DH parameters and geometric tree
-    * Geometrical modelling
-    * Dynamic modelling
-    * Base parameter generation using QR decomposition
-* Optimal excitation trajectory generation based on fourier-series
-* Excitation of robots, using [dVRK ROS stack](https://github.com/jhu-dvrk/dvrk-ros)
-* Data processing
-    * Derive velocity and acceleration from position measurements
-    * Zero-phase low-pass filter for original data
-    * Remove the data whose velocity is close to zero to decrease the noise for Coulomb friction
-* Identification
-    * Joint cable torque identification
-    * Ordinary Least Square (OLS)
-    * Weighted Least Square (WLS)
-    * Convex Optimization
-
-* Output of the identified parameters to json files
-
-## Requirements
+## 2. 环境及依赖
+* Anaconda
 * Python 3.12
-* Python modules
-    * NumPy, SymPy, Matplotlib, cloudpickle, Pandas
-    * SciPy, CvxOpt, PyOpt, 
+* Python库
+    * NumPy, SymPy, Matplotlib, cloudpickle, Pandas, SciPy, CvxOpt, PyOpt, pathlib
 
-
-Anaconda is recommended.
-
-## Reference paper
-A paper describing the modeling and identification of the dVRK using this package can be downloaded here.
-
+## 3. 参考文献
 [A convex optimization-based dynamic model identification package for the da Vinci Research Kit](https://ieeexplore.ieee.org/document/8758871)
 
-
-The bibtex code for including this citation is provided:
 ~~~
 @ARTICLE{8758871, 
 author={Y. {Wang} and R. {Gondokaryono} and A. {Munawar} and G. S. {Fischer}}, 
@@ -64,33 +50,8 @@ ISSN={2377-3766},
 month={Oct},}
 ~~~
 
-## Examples
-* Master Tool Manipulator (MTM)
-  * [IPYNB file](main_mtm.ipynb)
-  * [Data collection video](https://www.youtube.com/watch?v=Sr3Uku1zgDw&index=5&list=PLkjUJbdG0RkTyNv7_gz-2ws8oqGo_xPtc&t=0s)
+## 4. 参考开源库
+- 本仓库fork了[dvrk_dynamics_identification](https://github.com/WPI-AIM/dvrk_dynamics_identification),在此基础上，新建了develop分支，develop分支的开发参考了大量源仓库的master分支代码。
+- 另外参考的开源代码有[SymPyBotics](https://github.com/cdsousa/SymPyBotics)
 
-* Patient Side Manipulator (PSM)
-  * [IPYNB file](main_psm.ipynb)
 
-## Author
-Yan Wang and Radian Gondokaryono, from [WPI AIM Lab](http://aimlab.wpi.edu/) 
-
-## Other similar packages
-When developing this work, we referred a lot from the following places:
-* [SymPyBotics](https://github.com/cdsousa/SymPyBotics)
-* [FloBaRoID](https://github.com/kjyv/FloBaRoID)
-
-## Some problems
-When I was using PyOpt, I found some problems with it. In ```pySLSQP.py``` file, these changes should be made to make it work.
-```
-gg = numpy.zeros([la], numpy.float) ==> gg = numpy.zeros(la, numpy.float)
-
-dg = numpy.zeros([la,n+1], numpy.float) ==> dg = numpy.zeros([la[0], n + 1], numpy.float)
-
-w = numpy.zeros([lw], numpy.float) ==> w = numpy.zeros(lw, numpy.float)
-
-jw = numpy.zeros([ljw], numpy.intc) ==> jw = numpy.zeros(ljw, numpy.intc)
-```
-Or simply replace the ```pySOLVOPT.py``` file in ```anaconda2/lib/python2.7/site-packages/pyOpt/pySOLVOPT/``` with the file in ```dyn_ident_py/design``` of this repository.
-
-		

@@ -22,6 +22,7 @@ def run(robot, trajectory, data, iden, config):
     sample_traj_folder_ = Path.cwd().parent / 'data' / robot.name_ / 'sample_trajectory'
     identification_folder_ = Path.cwd().parent / 'data' / robot.name_ / 'identification'
     codegen_folder_ = Path.cwd().parent / 'data' / robot.name_ / 'codegen'
+    excitation_traj_folder_ = Path.cwd().parent / 'data' / robot.name_ / 'excitation_trajectory'
 
     if config.create_robot_model_ is True :
 
@@ -54,28 +55,23 @@ def run(robot, trajectory, data, iden, config):
         print("\nstep6: Code Generation --------------------------------------------------")
         robotcode.CodeGen(robot_model, codegen_folder_)
 
-
-
-
-
-
     if config.design_excitation_traj_ is True:
-        print("\nstep6: Excitation Trajectory Optimization -------------------------------")
+        print("\nstep7: Excitation Trajectory Optimization -------------------------------")
         optimal_traj = traj_optimizer.TrajOptimizer(robot_model, trajectory.fourier_order_, trajectory.base_freq_,
                                                     joint_constraints=trajectory.joint_constraints_,
                                                     cartesian_constraints=trajectory.cartesian_constraints_)
-        utils.save_data(trajectory.traj_folder_, trajectory.traj_name, optimal_traj)
+        utils.save_data(excitation_traj_folder_, trajectory.traj_name, optimal_traj)
     else:
-        print("\nstep6: Excitation Trajectory Optimization Skipping ...")
+        print("\nstep7: Excitation Trajectory Optimization Skipping ...")
 
     if config.sample_data_process_ is True:
-        print("\nstep7: Sample Data Process  ---------------------------------------------")
+        print("\nstep8: Sample Data Process  ---------------------------------------------")
         data_processing.DataProcessor(data, sample_traj_folder_)
     else:
-        print("\nstep7: Sample Data Process Skipping ...")
+        print("\nstep8: Sample Data Process Skipping ...")
 
     if config.dynamics_identification_ is True:
-        print("\nstep8: Dynamics_Parameters Identification -------------------------------")
+        print("\nstep9: Dynamics_Parameters Identification -------------------------------")
         # 辨识前数据预处理(耗时操作)
         regressor_matrix_file_name = f"regressor_matrix"
         if iden.gen_regressor_ is True:

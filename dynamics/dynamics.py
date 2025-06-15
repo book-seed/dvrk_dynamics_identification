@@ -43,9 +43,10 @@ class Dynamics:
             self._calc_H()
             self._calc_H_func()
             self._calc_base_param()
-            print("_calc_base_param Cost Time: {} seconds".format(round(time.time() - start_time, 6)))
+            print("_calc_base_param_and_H_b_function Cost Time: {} seconds".format(round(time.time() - start_time, 6)))
 
             # 重组动力学方程为 H_b * base_param 形式
+            print("restructure dynamics equation ...")
             start_time = time.time()
             p = [f'p{i}' for i in range(self.base_num)]
             p = sympy.Matrix(p)
@@ -54,9 +55,16 @@ class Dynamics:
                   .format(round(time.time() - start_time, 6)))
 
             # 计算MCG
+            print("calc M C G Matrix ...")
             start_time = time.time()
             self._calc_MCG()
             print("_multi_process_calc_MCG Cost Time: {} seconds".format(round(time.time() - start_time, 6)))
+
+            # 验证MCG分解结果
+            print("evaluate the result ...")
+            start_time = time.time()
+            self._evaluation()
+            print("MCG evaluation Cost Time: {} seconds".format(round(time.time() - start_time, 6)))
 
             self._save_data()
 
@@ -277,6 +285,27 @@ class Dynamics:
         self._calc_M()
         self.c = mc - self.m
         self._calc_C()
+
+    def _evaluation(self):
+
+        q = self.rbt_def.coordinates
+        dq = self.rbt_def.d_coordinates
+        ddq = self.rbt_def.dd_coordinates
+
+        p = [f'p{i}' for i in range(self.base_num)]
+
+        torque = (self.M * sympy.Matrix(ddq) + self.C * sympy.Matrix(dq))+ self.G
+        error = torque - self.tau
+
+        rand_q = np.random.rand(len(q))
+        rand_dq = np.random.rand(len(dq))
+        rand_ddq = np.random.rand(len(ddq))
+        rand_p = np.random.rand(self.base_num)
+
+        rand_err = error.subs(list(zip([*q, *dq, *ddq, *p], [*rand_q, *rand_dq, *rand_ddq, *rand_p])))
+        float_err = np.array(rand_err.applyfunc(lambda x: float(x.evalf())), dtype=float)
+        abs_err = np.sqrt(np.sum(float_err ** 2))
+        print(f"symbol deduce error is {abs_err}")
 
     def _save_data(self):
         data = [('tau', self.tau),

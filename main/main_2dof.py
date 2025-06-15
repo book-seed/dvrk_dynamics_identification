@@ -36,17 +36,15 @@ robot = Robot(name_=model_name, model_folder_=model_folder, dh_=dh, dh_conventio
 # ------------------------- 激励轨迹定义 ---------------------------------------------------------------------------------
 
 trajectory_name = 'three_order_fourier_traj'
-optimal_traj_folder = '/data/' + model_name + '/optimal_traj/'
 base_freq = 0.1
 fourier_order = 6
 cartesian_constraints = []
 joint_constraints = []
 
 Excitation_Traj = namedtuple('Excitation_Traj',
-                             ['traj_name_', 'traj_folder_', 'base_freq_', 'fourier_order_',
+                             ['traj_name_', 'base_freq_', 'fourier_order_',
                               'joint_constraints_', 'cartesian_constraints_'])
 trajectory = Excitation_Traj(traj_name_=trajectory_name,
-                             traj_folder_=optimal_traj_folder,
                              base_freq_=base_freq,
                              fourier_order_=fourier_order,
                              joint_constraints_=joint_constraints,
@@ -109,8 +107,8 @@ Config = namedtuple('Config', ['load_kinematic_from_file_', 'load_dynamic_from_f
 config = Config(load_kinematic_from_file_=False,
                 load_dynamic_from_file_=False,
                 create_robot_model_=False,
-                code_generation_=True,
-                design_excitation_traj_=False,
+                code_generation_=False,
+                design_excitation_traj_=True,
                 sample_data_process_=False,
                 dynamics_identification_=False)
 

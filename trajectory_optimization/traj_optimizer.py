@@ -174,7 +174,7 @@ class TrajOptimizer:
                           bounds=bounds,
                           constraints=cons,
                           tol=1e-5,
-                          options={'maxiter': 5000, 'disp': True}        )
+                          options={'maxiter': 2000, 'disp': True}        )
 
         self.f_result = result.fun
         self.x_result = result.x
