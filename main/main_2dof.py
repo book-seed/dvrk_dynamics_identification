@@ -104,14 +104,15 @@ iden = Iden(gen_regressor_=gen_regressor, solver_=solver, callback_=iden_res_cal
 ############################################################################
 Config = namedtuple('Config', ['load_kinematic_from_file_', 'load_dynamic_from_file_',
                                'create_robot_model_', 'design_excitation_traj_', 'sample_data_process_',
-                               'dynamics_identification_'])
+                               'dynamics_identification_', 'code_generation_'])
 
 config = Config(load_kinematic_from_file_=False,
                 load_dynamic_from_file_=False,
-                create_robot_model_=True,
+                create_robot_model_=False,
+                code_generation_=True,
                 design_excitation_traj_=False,
                 sample_data_process_=False,
-                dynamics_identification_=True)
+                dynamics_identification_=False)
 
 # ------------------------- 运行 ----------------------------------------------------------------------------------------
 

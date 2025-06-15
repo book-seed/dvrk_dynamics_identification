@@ -12,12 +12,16 @@ from codegen import robotcode
 def run(robot, trajectory, data, iden, config):
 
     # 是否需要计算或加载机器人模型
-    request_robot_model_ = config.design_excitation_traj_ or config.dynamics_identification_
+    request_robot_model_ = (config.create_robot_model_ or
+                            config.code_generation_ or
+                            config.design_excitation_traj_ or
+                            config.dynamics_identification_)
     
     # 数据保存路径
     model_folder_ = Path.cwd().parent / 'data' / robot.name_ / 'model'
     sample_traj_folder_ = Path.cwd().parent / 'data' / robot.name_ / 'sample_trajectory'
     identification_folder_ = Path.cwd().parent / 'data' / robot.name_ / 'identification'
+    codegen_folder_ = Path.cwd().parent / 'data' / robot.name_ / 'codegen'
 
     if config.create_robot_model_ is True :
 
@@ -46,9 +50,11 @@ def run(robot, trajectory, data, iden, config):
     else:
         print("\nstep5: Load Robot Model Skipping ...")
 
-    print(robot_model.H_b)
+    if config.code_generation_ is True:
+        print("\nstep6: Code Generation --------------------------------------------------")
+        robotcode.CodeGen(robot_model, codegen_folder_)
 
-    robotcode.CodeGen(robot_model)
+
 
 
 

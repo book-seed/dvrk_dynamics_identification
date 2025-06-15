@@ -3,6 +3,7 @@ from dynamics.dynamics import Dynamics
 
 class RobotModel:
     def __init__(self, dyn):
+        self.name = dyn.rbt_def.name
         self.dof = dyn.rbt_def.dof
         self.coordinates = dyn.rbt_def.coordinates
         self.d_coordinates = dyn.rbt_def.d_coordinates
@@ -28,6 +29,9 @@ class RobotModel:
         self.M = dyn.M
         self.C = dyn.C
         self.G = dyn.G
+        self.m = dyn.m
+        self.c = dyn.c
+        self.g = dyn.g
         self.H_func = dyn.H_func
         self.H_b = dyn.H_b
         self.H_b_func = dyn.H_b_func

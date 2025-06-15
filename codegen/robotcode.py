@@ -6,9 +6,19 @@ from ccodegen import generate_c_code
 
 
 class CodeGen:
-    def __init__(self, model):
+    def __init__(self, model, folder):
         symbol_vars_ = model.coordinates + model.d_coordinates + model.dd_coordinates
+        param_vars = [f'p{i}' for i in range(model.base_num)]
+
+        # H
+        res = generate_c_code(model.H, symbol_vars_, output_file=folder / f"{model.name}_H_function.cpp", func_name="get_H_function")
+        print(res)
 
         # H_b
-        generate_c_code(symbol_vars_, model.H_b, f"dyn_Hb_function.cpp", "get_Hb_function")
-        print("C代码已生成到 Hb_function.cpp")
+        res = generate_c_code(model.H_b, symbol_vars_, output_file=folder / f"{model.name}_Hb_function.cpp", func_name="get_Hb_function")
+        print(res)
+
+        # tau
+        res = generate_c_code(model.tau, symbol_vars_, param_vars=param_vars, output_file=folder / f"{model.name}_tau_function.cpp",
+                              func_name="get_tau_function")
+        print(res)

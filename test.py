@@ -1,14 +1,6 @@
+import sympy as sp
 
-def function(a_, b_):
-    tmp = a_
-    a_ = b_
-    b_ = tmp
-    print(a_, b_)
+a = sp.zeros(4)
 
 
-
-if __name__ == '__main__':
-    a = 10
-    b = 100
-    function(a,b)
-    print(a, b)
+v = 1

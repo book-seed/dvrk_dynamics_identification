@@ -1,5 +1,6 @@
 import sys
 import os
+
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 import sympy
 import numpy as np
@@ -10,7 +11,6 @@ from utils import utils
 import multiprocessing
 import dill
 from multiprocessing.reduction import ForkingPickler
-
 
 # 让 ForkingPickler 使用 dill 进行序列化
 ForkingPickler.dumps = dill.dumps
@@ -24,46 +24,41 @@ class Dynamics:
         self.geom = geom
         self._g = np.matrix(g)
 
-        condition = 'load_dynamic_from_file'
         if load_data_from_file is True:
             print("load dynamic data from file starting.")
             start_time = time.time()
             self._load_data()
-            # self._load_data_sp()
-            print("load dynamic data from file finished. Cost Time: {} seconds".format(round(time.time() - start_time, 6)))
-            
-            # 验证多进程结果与单进程结果的一致性
-            # err_tau = [sympy.simplify(a - b) for a, b in zip(self.tau, self.tau_sp)]
-            # err_H   = [sympy.simplify(a - b) for a, b in zip(self.H, self.H_sp)]
-            # err_M   = [sympy.simplify(a - b) for a, b in zip(self.M, self.M_sp)]
-            # err_C   = [sympy.simplify(a - b) for a, b in zip(self.C, self.C_sp)]
-            # err_G   = [sympy.simplify(a - b) for a, b in zip(self.G, self.G_sp)]
-            # print(f'err_tau: {err_tau}')
-            # print(f'err_H: {err_H}')
-            # print(f'err_M: {err_M}')
-            # print(f'err_C: {err_C}')
-            # print(f'err_G: {err_G}')
+            print("load dynamic data from file finished. Cost Time: {} seconds".format(
+                round(time.time() - start_time, 6)))
+
         else:
-            # start_time = time.time()
-            # self.tau = self._multi_process_calc_dyn()
-            # print("_multi_process_calc_dyn calc dynamic finished. Cost Time: {} seconds".format(round(time.time() - start_time, 6)))
-            # start_time = time.time()
-            # self._multi_process_calc_H_MCG()
-            # print("_multi_process_calc_HMCG Cost Time: {} seconds".format(round(time.time() - start_time, 6)))
-            # self._save_data()
-            
-            # 单进程
+            # 拉格朗日法计算动力学方程
             start_time = time.time()
-            self._calc_dyn()
-            print("_calc_dyn calc dynamic finished. Cost Time: {} seconds".format(round(time.time() - start_time, 6)))
+            self.tau = self._multi_process_calc_dyn()
+            print("_multi_process_calc_dyn calc dynamic finished. Cost Time: {} seconds".format(
+                round(time.time() - start_time, 6)))
+
+            # 计算 H，H_func, base_param
             start_time = time.time()
-            self._calc_H_MCG()
-            print("_calc_HMCG Cost Time: {} seconds".format(round(time.time() - start_time, 6)))
-            self._save_data_sp()
+            self._calc_H()
+            self._calc_H_func()
+            self._calc_base_param()
+            print("_calc_base_param Cost Time: {} seconds".format(round(time.time() - start_time, 6)))
 
-        self._calc_H_func()
-        self._calc_base_param()
+            # 重组动力学方程为 H_b * base_param 形式
+            start_time = time.time()
+            p = [f'p{i}' for i in range(self.base_num)]
+            p = sympy.Matrix(p)
+            self.tau = sympy.simplify(self.H_b * p)
+            print("restructure dynamics into the form of Hb * base_param Cost Time: {} seconds"
+                  .format(round(time.time() - start_time, 6)))
 
+            # 计算MCG
+            start_time = time.time()
+            self._calc_MCG()
+            print("_multi_process_calc_MCG Cost Time: {} seconds".format(round(time.time() - start_time, 6)))
+
+            self._save_data()
 
         print("finished creating robot dynamics")
 
@@ -80,17 +75,19 @@ class Dynamics:
             k_e_n = 0
             if self.rbt_def.use_inertia[num]:
                 # 1/2 * m * v^2 + 1/2 * I * w^2
-                k_e_n = self.rbt_def.m[num] * self.geom.v_cw[num].dot(self.geom.v_cw[num])/2 +\
-                       (self.geom.w_b[num].transpose() * self.rbt_def.I_by_Llm[num] * self.geom.w_b[num])[0, 0]/2
+                k_e_n = self.rbt_def.m[num] * self.geom.v_cw[num].dot(self.geom.v_cw[num]) / 2 + \
+                        (self.geom.w_b[num].transpose() * self.rbt_def.I_by_Llm[num] * self.geom.w_b[num])[0, 0] / 2
 
                 # k_e_n = sympy.simplify(k_e_n) # this is replaced by the following code to reduce time cost
-                k_e_n = sympy.factor(sympy.expand(k_e_n) - sympy.expand(k_e_n * self.rbt_def.m[num]).subs(self.rbt_def.m[num], 0)/self.rbt_def.m[num])
+                k_e_n = sympy.factor(
+                    sympy.expand(k_e_n) - sympy.expand(k_e_n * self.rbt_def.m[num]).subs(self.rbt_def.m[num], 0) /
+                    self.rbt_def.m[num])
 
             k_e += k_e_n
 
         # Lagrangian
         L = k_e - p_e
-        print("_calc_dyn_L Cost Time: {} seconds".format(round(time.time() - start_time, 6)))   
+        print("_calc_dyn_L Cost Time: {} seconds".format(round(time.time() - start_time, 6)))
 
         start_time = time.time()
         tau = []
@@ -103,7 +100,7 @@ class Dynamics:
             dk_ddq_dt = dk_ddq_dtt.subs(self.rbt_def.subs_ddqt2ddq + self.rbt_def.subs_dqt2dq + self.rbt_def.subs_qt2q)
             dL_dq = sympy.diff(L, q)
             tau.append(sympy.expand(dk_ddq_dt - dL_dq))
-        print("_calc_dyn_tau Cost Time: {} seconds".format(round(time.time() - start_time, 6)))   
+        print("_calc_dyn_tau Cost Time: {} seconds".format(round(time.time() - start_time, 6)))
 
         print("adding frictions and springs...")
         tau = copy.deepcopy(tau)
@@ -132,18 +129,18 @@ class Dynamics:
                 tau[tau_index] += tau_Ia
 
         self.tau = tau
-    
-    @staticmethod  
+
+    @staticmethod
     def _static_calc_Ln(m, use_inertia, I_by_Llm, p_c, v_cw, w_b, g):
-        p_e_n = -m * p_c.dot(g)  
+        p_e_n = -m * p_c.dot(g)
         k_e_n = 0
         if use_inertia:
-            k_e_n = m * v_cw.dot(v_cw)/2 + (w_b.transpose() * I_by_Llm * w_b)[0, 0]/2
-            k_e_n = sympy.factor(sympy.expand(k_e_n) - sympy.expand(k_e_n * m).subs(m, 0)/m)
-        
+            k_e_n = m * v_cw.dot(v_cw) / 2 + (w_b.transpose() * I_by_Llm * w_b)[0, 0] / 2
+            k_e_n = sympy.factor(sympy.expand(k_e_n) - sympy.expand(k_e_n * m).subs(m, 0) / m)
+
         L_n = k_e_n - p_e_n
         return k_e_n, L_n
-    
+
     @staticmethod
     def _static_calc_tau_for_pair(q, dq, rbt_def, k_e, L):
         dk_ddq = sympy.diff(k_e, dq)
@@ -152,27 +149,28 @@ class Dynamics:
         dk_ddq_dt = dk_ddq_dtt.subs(rbt_def.subs_ddqt2ddq + rbt_def.subs_dqt2dq + rbt_def.subs_qt2q)
         dL_dq = sympy.diff(L, q)
         return sympy.expand(dk_ddq_dt - dL_dq)
-      
+
     def _multi_process_calc_dyn(self):
-        
+
         print("calculating lagrangian...")
         start_time = time.time()
         pool = multiprocessing.Pool(processes=multiprocessing.cpu_count())
         tasks = []
         for num in self.rbt_def.link_nums[1:]:
             # task = pool.apply_async(self._static_calc_Ln, args=(num, self.rbt_def, self.geom, self._g))
-            task = pool.apply_async(self._static_calc_Ln, args=(self.rbt_def.m[num], self.rbt_def.use_inertia[num], self.rbt_def.I_by_Llm[num], 
-                                                                self.geom.p_c[num], self.geom.v_cw[num], self.geom.w_b[num], self._g))
+            task = pool.apply_async(self._static_calc_Ln, args=(
+            self.rbt_def.m[num], self.rbt_def.use_inertia[num], self.rbt_def.I_by_Llm[num],
+            self.geom.p_c[num], self.geom.v_cw[num], self.geom.w_b[num], self._g))
             tasks.append(task)
         pool.close()
         pool.join()
         results = [task.get() for task in tasks]
         k_e = sum([result[0] for result in results])
         L = sum([result[1] for result in results])
-        print("_multi_process_calc_dyn_Le Cost Time: {} seconds".format(round(time.time() - start_time, 6)))    
+        print("_multi_process_calc_dyn_Le Cost Time: {} seconds".format(round(time.time() - start_time, 6)))
 
-        print("calculating joint torques...")  
-        start_time = time.time()    
+        print("calculating joint torques...")
+        start_time = time.time()
         pool = multiprocessing.Pool(processes=multiprocessing.cpu_count())
         tasks = []
         for q, dq in zip(self.rbt_def.coordinates, self.rbt_def.d_coordinates):
@@ -181,8 +179,8 @@ class Dynamics:
         pool.close()
         pool.join()
         tau = [task.get() for task in tasks]
-        print("_multi_process_calc_dyn_tau Cost Time: {} seconds".format(round(time.time() - start_time, 6)))   
- 
+        print("_multi_process_calc_dyn_tau Cost Time: {} seconds".format(round(time.time() - start_time, 6)))
+
         print("adding frictions and springs...")
         tau = copy.deepcopy(tau)
 
@@ -215,90 +213,11 @@ class Dynamics:
         print("calculating H ...")
         self.H, b = sympy.linear_eq_to_matrix(self.tau, self.rbt_def.bary_params)
 
-    @staticmethod
-    def _static_calc_H(tau, rbt_def):
-        print("calculating H ...")
-        A, b = sympy.linear_eq_to_matrix(tau, rbt_def.bary_params)
-        return A  
-    
     def _calc_H_func(self):
         print("calculating H_func ...")
-        input_vars = tuple(self.rbt_def.coordinates +self.rbt_def.d_coordinates + self.rbt_def.dd_coordinates)
+        input_vars = tuple(self.rbt_def.coordinates + self.rbt_def.d_coordinates + self.rbt_def.dd_coordinates)
         self.H_func = sympy.lambdify(input_vars, self.H)
-          
-    def _calc_M(self):
-        print("calculating M ...")
-        self.M, b = sympy.linear_eq_to_matrix(self.tau, self.rbt_def.dd_coordinates)
-    
-    @staticmethod
-    def _static_calc_M(tau, rbt_def):
-        print("calculating M ...")
-        A, b = sympy.linear_eq_to_matrix(tau, rbt_def.dd_coordinates)
-        return A
-    
-    def _calc_G(self):
-        print("calculating G ...")
-        subs_qdq2zero = [(dq, 0) for dq in self.rbt_def.d_coordinates]
-        subs_qdq2zero += [(ddq, 0) for ddq in self.rbt_def.dd_coordinates]
-        self.G = sympy.Matrix(self.tau).subs(subs_qdq2zero)
 
-    @staticmethod
-    def _static_calc_G(tau, rbt_def):
-        print("calculating G ...")
-        subs_qdq2zero = [(dq, 0) for dq in rbt_def.d_coordinates]
-        subs_qdq2zero += [(ddq, 0) for ddq in rbt_def.dd_coordinates]
-        A = sympy.Matrix(tau).subs(subs_qdq2zero)
-        return A
-    
-    def _calc_C(self):
-        print("calculating C ...")
-        subs_ddq2zero = [(ddq, 0) for ddq in self.rbt_def.dd_coordinates]
-        self.C = sympy.Matrix(self.tau).subs(subs_ddq2zero) - self.G
-
-    @staticmethod
-    def _static_calc_C(tau, rbt_def):
-        print("calculating C ...")
-        subs_ddq2zero = [(ddq, 0) for ddq in rbt_def.dd_coordinates]
-        CG = sympy.Matrix(tau).subs(subs_ddq2zero)
-        return CG
-
-    def _calc_H_MCG(self):
-        print("Calculating H, M, C and G...")
-        self._calc_H()
-        self._calc_M()
-        self._calc_G()
-        self._calc_C()
-        
-    def _multi_process_calc_H_MCG(self):
-        with multiprocessing.Pool(processes=multiprocessing.cpu_count()) as pool:
-            tasks = [(self._static_calc_H, (self.tau, self.rbt_def)),
-                     (self._static_calc_M, (self.tau, self.rbt_def)),
-                     (self._static_calc_C, (self.tau, self.rbt_def)),
-                     (self._static_calc_G, (self.tau, self.rbt_def))]
-
-            results = []
-            for task, args in tasks:
-                result = pool.apply_async(task, args)
-                results.append(result)
-
-            pool.close()
-            pool.join()
-
-            task_results = []
-            for i, result in enumerate(results):
-                task_results.append((tasks[i][0].__name__, result.get()))
-                
-            res_dict = dict(task_results)
-            if '_static_calc_H' in res_dict:
-                self.H = res_dict['_static_calc_H']
-            if '_static_calc_M' in res_dict:
-                self.M = res_dict['_static_calc_M']
-            if '_static_calc_G' in res_dict:
-                self.G = res_dict['_static_calc_G']
-            if '_static_calc_C' in res_dict:
-                self.C = res_dict['_static_calc_C'] - self.G
-                # self.C, b = sympy.linear_eq_to_matrix(C, self.rbt_def.d_coordinates)
-        
     def _calc_base_param(self):
         print("calculating base parameter...")
         r, P_X, P = find_dyn_parm_deps(len(self.rbt_def.coordinates), len(self.rbt_def.bary_params), self.H_func)
@@ -315,12 +234,59 @@ class Dynamics:
         print("Creating H_b function...")
         self.H_b_func = sympy.lambdify(input_vars, self.H_b)
 
+    def _calc_M(self):
+        print("calculating M ...")
+        M = sympy.zeros(self.rbt_def.dof)
+        for i in range(self.rbt_def.dof):
+            one_hot = sympy.zeros(self.rbt_def.dof, 1)
+            one_hot[i] = 1
+            subs_ddq2one_hot = [(ddq, ele) for ddq, ele in zip(self.rbt_def.dd_coordinates, one_hot)]
+            M[:,i] = sympy.Matrix(self.m).subs(subs_ddq2one_hot)
+        self.M = M
+        # M_tmp, b = sympy.linear_eq_to_matrix(self.tau, self.rbt_def.dd_coordinates)
+        # print(self.M - M_tmp)
+
+    def _calc_G(self):
+        print("calculating G ...")
+        subs_qdq2zero = [(dq, 0) for dq in self.rbt_def.d_coordinates]
+        subs_qdq2zero += [(ddq, 0) for ddq in self.rbt_def.dd_coordinates]
+        self.G = sympy.Matrix(self.tau).subs(subs_qdq2zero)
+
+    def _calc_C(self):
+        print("calculating C ...")
+
+        def christoffel(ii,jj,kk):
+            return 0.5 * (sympy.diff(self.M[ii,jj], self.rbt_def.coordinates[kk])
+                          + sympy.diff(self.M[ii,kk], self.rbt_def.coordinates[jj])
+                          - sympy.diff(self.M[jj,kk], self.rbt_def.coordinates[ii]))
+
+        C = sympy.zeros(self.rbt_def.dof)
+        for i in range(self.rbt_def.dof):
+            for j in range(self.rbt_def.dof):
+                for k in range(self.rbt_def.dof):
+                    C[i,j] += christoffel(i,j,k) * self.rbt_def.d_coordinates[k]
+
+        self.C = C
+
+    def _calc_MCG(self):
+        self._calc_G()
+        self.g = self.G
+        mc = self.tau - self.G
+        subs_dq2zero = [(dq, 0) for dq in self.rbt_def.d_coordinates]
+        self.m = sympy.Matrix(mc).subs(subs_dq2zero)
+        self._calc_M()
+        self.c = mc - self.m
+        self._calc_C()
+
     def _save_data(self):
         data = [('tau', self.tau),
                 ('H', self.H),
                 ('M', self.M),
                 ('C', self.C),
-                ('G', self.G)]
+                ('G', self.G),
+                ('m', self.m),
+                ('c', self.c),
+                ('g', self.g)]
 
         utils.save_data(self.model_folder, 'dynamics', data)
 
@@ -338,27 +304,10 @@ class Dynamics:
                     self.C = value
                 case 'G':
                     self.G = value
-                    
-    def _save_data_sp(self):
-        data = [('tau', self.tau),
-                ('H', self.H),
-                ('M', self.M),
-                ('C', self.C),
-                ('G', self.G)]
+                case 'm':
+                    self.m = value
+                case 'c':
+                    self.c = value
+                case 'g':
+                    self.g = value
 
-        utils.save_data(self.model_folder, 'dynamics_sp', data)
-
-    def _load_data_sp(self):
-        data = utils.load_data(self.model_folder, 'dynamics_sp')
-        for key, value in data:
-            match key:
-                case 'tau':
-                    self.tau_sp = value
-                case 'H':
-                    self.H_sp = value
-                case 'M':
-                    self.M_sp = value
-                case 'C':
-                    self.C_sp = value
-                case 'G':
-                    self.G_sp = value
