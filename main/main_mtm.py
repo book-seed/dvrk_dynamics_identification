@@ -7,8 +7,9 @@ from collections import namedtuple
 from utils import utils
 from numpy import deg2rad
 
-# ------------------------- 模型定义 ------------------------------------------------------------------------------------
-
+########################################################################################################################
+#---------------------------------------------------- 模型定义 ---------------------------------------------------------#
+########################################################################################################################
 model_name = 'mtm'
 q0, q1, q2, q3, q4, q5, q6, q7, q8, q9, q10 = utils.new_sym('q:11')
 pi = sympy.pi
@@ -56,17 +57,18 @@ d_l = l - l_r
 r_f = r_s * h_s * sympy.sin(pi + q_o - q) / l
 dl5 = r_f * d_l
 
-dh = [(L_b,  -1,   [L_1, M_4],  0,     0,      0,       0,           False, False, False, dlN),
-      (L_1,  L_b,  [L_2, L_31], 0,     0,      -l_b2p,  qmd1,        True,  False, True, dlN),
-      (L_2,  L_1,  [L_30],      0,     -pi/2, 0,       qmd2+pi/2,  True,  False, True, dlN),
-      (L_30, L_2,  [L_4],       l_arm, 0,      0,       qmd30+pi/2, True,  False, True, dlN),
-      (L_31, L_1,  [L_32],      0,     -pi/2, 0,       qmd31+pi,   True,  False, True, dlN),
-      (L_32, L_31, [],          l_b2f, 0,      0,       qmd32-pi/2, True,  False, True, dlN),
-      (L_4,  L_30, [L_5],       l_fa,  -pi/2, 0.151,   qmd4,        True,  False, True, dlN),
-      (L_5,  L_4,  [L_6],       0,     pi/2,  0,       qmd5,        True,  False, True, dl5),
-      (L_6,  L_5,  [L_7],       0,     -pi/2, 0,       qmd6+pi/2,  True,  False, True, dlN),
-      (L_7,  L_6,  [],          0,     -pi/2, 0,       qmd7+pi,    True,  False, True, dlN),
-      (M_4,  L_b,  [],          0,     0,      0,       q4,          False, True,  True, dlN)]
+# Joint number | prev link | succ links | a | alpha | d | theta | link inertia | motor inertia | friction | spring
+dh = [( L_b,   -1,   [L_1, M_4],      0,      0,       0,           0, False,  False, False, dlN),
+      ( L_1,  L_b,  [L_2, L_31],      0,      0,  -l_b2p,        qmd1,  True,  False,  True, dlN),
+      ( L_2,  L_1,       [L_30],      0,  -pi/2,       0,   qmd2+pi/2,  True,  False,  True, dlN),
+      (L_30,  L_2,        [L_4],  l_arm,      0,       0,  qmd30+pi/2,  True,  False,  True, dlN),
+      (L_31,  L_1,       [L_32],      0,  -pi/2,       0,    qmd31+pi,  True,  False,  True, dlN),
+      (L_32, L_31,           [],  l_b2f,      0,       0,  qmd32-pi/2,  True,  False,  True, dlN),
+      ( L_4, L_30,        [L_5],   l_fa,  -pi/2,   0.151,        qmd4,  True,  False,  True, dlN),
+      ( L_5,  L_4,        [L_6],       0,  pi/2,       0,        qmd5,  True,  False,  True, dl5),
+      ( L_6,  L_5,        [L_7],       0, -pi/2,       0,   qmd6+pi/2,  True,  False,  True, dlN),
+      ( L_7,  L_6,           [],       0, -pi/2,       0,     qmd7+pi,  True,  False,  True, dlN),
+      ( M_4,  L_b,           [],       0,     0,       0,          q4, False,   True,  True, dlN)]
 
 friction_type = ['coulomb', 'viscous', 'offset']
 dh_method = 'mdh'
@@ -74,12 +76,14 @@ dh_method = 'mdh'
 Robot = namedtuple('Robot', ['name_', 'dh_', 'dh_convention_', 'friction_type_'])
 robot = Robot(name_=model_name, dh_=dh, dh_convention_=dh_method, friction_type_=friction_type)
 
-# ------------------------- 激励轨迹定义 ---------------------------------------------------------------------------------
-
+########################################################################################################################
+#---------------------------------------------------- 激励轨迹 ---------------------------------------------------------#
+########################################################################################################################
 trajectory_name = 'three_order_fourier_traj'
 optimal_traj_folder = '/data/' + model_name + '/optimal_traj/'
 base_freq = 0.1
 fourier_order = 6
+control_freq = 200
 cartesian_constraints = []
 joint_constraints = [(qmd1,  deg2rad(-57),  deg2rad(29),  deg2rad(-160), deg2rad(160), deg2rad(-1600), deg2rad(1600)),
                      (qmd2,  deg2rad(-10),  deg2rad(60),  deg2rad(-180), deg2rad(180), deg2rad(-1800), deg2rad(1800)),
@@ -92,22 +96,23 @@ joint_constraints = [(qmd1,  deg2rad(-57),  deg2rad(29),  deg2rad(-160), deg2rad
 
 Excitation_Traj = namedtuple('Excitation_Traj',
                              ['traj_name_', 'traj_folder_', 'base_freq_', 'fourier_order_',
-                              'joint_constraints_', 'cartesian_constraints_'])
+                              'control_freq_', 'joint_constraints_', 'cartesian_constraints_'])
 trajectory = Excitation_Traj(traj_name_=trajectory_name,
                              traj_folder_=optimal_traj_folder,
                              base_freq_=base_freq,
                              fourier_order_=fourier_order,
+                             control_freq_=control_freq,
                              joint_constraints_=joint_constraints,
                              cartesian_constraints_=cartesian_constraints)
 
-############################################################################
-#----------------------------- 采样数据处理 ---------------------------------#
-############################################################################
+########################################################################################################################
+#---------------------------------------------------- 采样数据处理 ------------------------------------------------------#
+########################################################################################################################
 
 sample_traj_name = 'two_results'
-sample_freq = 200   # 数据采样频率
-cutoff_freq = 5 * trajectory.base_freq_ * trajectory.fourier_order_  # 低通滤波器截止频率
-cut_num = 200       # 数据掐头去尾
+sample_freq = 200                                                       # 数据采样频率(周期性采样，设置和激励轨迹中的控制频率相同)
+cutoff_freq = 5 * trajectory.base_freq_ * trajectory.fourier_order_     # 低通滤波器截止频率
+cut_num = 200                                                           # 数据掐头去尾(去掉前后{cut_num}个数据)
 filter_order = 6
 
 # 定义回调函数，从文件中读取数据后，根据模型要求，预先对数据进行处理
@@ -129,9 +134,9 @@ sample_data = Sample_Data_Process(
     cut_num_=cut_num,
     callback_=data_pre_process_callback)
 
-############################################################################
-#------------------------------ 辨识策略 -----------------------------------#
-############################################################################
+########################################################################################################################
+#------------------------------------------------- 辨识策略 ------------------------------------------------------------#
+########################################################################################################################
 
 # 是否需要重新生成Wb (如果机器人模型未变，采样数据未变，求解器未变，Wb存在的情况下，无需重新生成Wb)
 gen_regressor = False
@@ -147,18 +152,18 @@ def iden_res_callback(filt_q, filt_dq, filt_tau, iden_tau):
 Iden = namedtuple('Iden', ['gen_regressor_', 'solver_', 'callback_'])
 iden = Iden(gen_regressor_=gen_regressor, solver_=solver, callback_=iden_res_callback)
 
-############################################################################
-#------------------------------ 选项配置 -----------------------------------#
-############################################################################
+########################################################################################################################
+#------------------------------------------------- 选项配置 ------------------------------------------------------------#
+########################################################################################################################
 Config = namedtuple('Config', ['load_kinematic_from_file_', 'load_dynamic_from_file_',
                                'create_robot_model_', 'design_excitation_traj_', 'sample_data_process_',
                                'dynamics_identification_'])
 
-config = Config(load_kinematic_from_file_=True,
-                load_dynamic_from_file_=True,
-                create_robot_model_=False,
-                design_excitation_traj_=False,
-                sample_data_process_=False,
+config = Config(load_kinematic_from_file_=False,
+                load_dynamic_from_file_=False,
+                create_robot_model_=True,
+                design_excitation_traj_=True,
+                sample_data_process_=True,
                 dynamics_identification_=True)
 
 # ------------------------- 运行 ----------------------------------------------------------------------------------------

@@ -13,22 +13,15 @@ else:
 
 
 class FourierTraj:
-    def __init__(self, dof, order, base_freq, sample_num_per_period=10, frequency='nan', stable_time=0, final_time=10):
+    def __init__(self, dof, order, base_freq, frequency, sample_num, stable_time=0.5):
         self.dof = dof
         self.order = order
         self.base_freq = base_freq
-        self.sample_num_per_period = sample_num_per_period
         self.stable_time = stable_time
-        self.frequency = frequency      # 采样频率 ？
+        self.frequency = frequency      # 控制频率 ？
 
-        # if no specified frequency and final_time, generate a one-period trajectory.
-        if math.isnan(float(frequency)):
-            self.sample_num = round(self.order * self.sample_num_per_period + 1)
-            self.period = 1.0 / self.base_freq
-            self.frequency = self.sample_num/(final_time + stable_time)
-        else:
-            self.sample_num = round(float(frequency) * (final_time + stable_time))
-            self.period = final_time
+        self.sample_num = sample_num
+        self.period = math.ceil(1 / base_freq)      # 激励轨迹的持续时间
 
         self.q = np.zeros((self.sample_num, self.dof))
         self.dq = np.zeros((self.sample_num, self.dof))

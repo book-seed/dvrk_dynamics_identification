@@ -3,7 +3,7 @@ from kinematics import geometry
 from dynamics import dynamics
 from utils import utils
 from model import robot_def, robot_model_data
-from trajectory_optimization import traj_optimizer
+from trajectory_optimization import traj_optimizer, traj_plotter
 from identification import data_processing, identification
 from codegen import robotcode
 
@@ -57,10 +57,10 @@ def run(robot, trajectory, data, iden, config):
 
     if config.design_excitation_traj_ is True:
         print("\nstep7: Excitation Trajectory Optimization -------------------------------")
-        optimal_traj = traj_optimizer.TrajOptimizer(robot_model, trajectory.fourier_order_, trajectory.base_freq_,
-                                                    joint_constraints=trajectory.joint_constraints_,
-                                                    cartesian_constraints=trajectory.cartesian_constraints_)
+        optimal_traj = traj_optimizer.TrajOptimizer(robot_model, trajectory)
         utils.save_data(excitation_traj_folder_, trajectory.traj_name, optimal_traj)
+        optimal_traj.make_traj_csv(excitation_traj_folder_, 'excitation_traj')
+        traj_plotter.TrajPlotter(optimal_traj.fourier_traj)
     else:
         print("\nstep7: Excitation Trajectory Optimization Skipping ...")
 
